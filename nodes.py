@@ -23,6 +23,7 @@ import torch
 
 from mflux.cli.defaults import defaults as ui
 from mflux.models.common.config import ModelConfig
+from mflux.utils.scale_factor import ScaleFactor
 
 try:
     from . import mflux_dispatch as D
@@ -137,6 +138,18 @@ def _clean_caption_prompt(prompt):
         except Exception:
             pass
     return prompt
+
+
+def _parse_resolution(val):
+    """SeedVR2 resolution: an int (shortest-edge pixels, e.g. 1080) or a scale
+    factor (e.g. '2x', '1.5x'); 'auto' / empty means 1x (no rescale)."""
+    s = str(val).strip().lower()
+    if s in ("", "auto"):
+        return ScaleFactor(value=1)
+    try:
+        return int(s)
+    except ValueError:
+        return ScaleFactor.parse(s)
 
 
 # --------------------------------------------------------------------------- #
@@ -436,7 +449,7 @@ class MfluxUpscale:
             "required": {
                 "image": ("IMAGE",),
                 "model": (["seedvr2-3b", "seedvr2-7b"], {"default": "seedvr2-3b"}),
-                "resolution": ("INT", {"default": 1080, "min": 256, "max": 4096, "step": 16, "tooltip": "Target shortest-edge resolution (pixels)."}),
+                "resolution": ("STRING", {"default": "2x", "tooltip": "Scale factor (e.g. 2x, 1.5x) or shortest-edge target in pixels (e.g. 1080)."}),
             },
             "optional": {
                 "softness": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05}),
@@ -469,7 +482,7 @@ class MfluxUpscale:
 
         path = _image_to_temp_png(image)
         try:
-            gen = inst.generate_image(seed=int(seed), image_path=path, resolution=int(resolution), softness=float(softness))
+            gen = inst.generate_image(seed=int(seed), image_path=path, resolution=_parse_resolution(resolution), softness=float(softness))
         finally:
             if os.path.exists(path):
                 try:
