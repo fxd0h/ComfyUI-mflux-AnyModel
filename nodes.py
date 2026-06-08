@@ -13,6 +13,7 @@ Nodes:
                       control map + strength) -> MFLUX_IMAGE.
   MfluxUpscale      — SeedVR2 one-step upscaler (its own model).
 """
+import json
 import os
 import tempfile
 from dataclasses import dataclass, field
@@ -114,6 +115,28 @@ def _image_to_temp_png(image_tensor):
     os.close(fd)
     Image.fromarray(arr).save(path)
     return path
+
+
+def _clean_caption_prompt(prompt):
+    """Pull a clean JSON caption out of an LLM's output. mflux's Ideogram parser
+    only uses the structured caption when the prompt starts with '{' and parses to
+    a dict; otherwise it degrades to plain text, which raises the model's
+    safety-filter false positives. An LLM (e.g. Gemma) may wrap the JSON in
+    ```json fences or a preamble, so extract the outermost JSON object."""
+    if not isinstance(prompt, str):
+        return prompt
+    s = prompt.strip()
+    if s.startswith("{"):
+        return s
+    i, j = s.find("{"), s.rfind("}")
+    if 0 <= i < j:
+        cand = s[i:j + 1]
+        try:
+            if isinstance(json.loads(cand), dict):
+                return cand
+        except Exception:
+            pass
+    return prompt
 
 
 # --------------------------------------------------------------------------- #
@@ -354,6 +377,7 @@ class MfluxModelSampler:
                  preset="(model default)", strict_caption_validation=False,
                  image=None, image_strength=0.6, mflux_image=None):
         handle = model
+        prompt = _clean_caption_prompt(prompt)
         if handle.free_comfy_first:
             _free_comfy()
 
