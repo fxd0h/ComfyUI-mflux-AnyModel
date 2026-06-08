@@ -13,6 +13,7 @@ Nodes:
                       control map + strength) -> MFLUX_IMAGE.
   MfluxUpscale      — SeedVR2 one-step upscaler (its own model).
 """
+import glob
 import json
 import os
 import tempfile
@@ -49,24 +50,54 @@ STRENGTH_LIST = {"redux_image_strengths"}
 QUANTIZE_CHOICES = ["none"] + [str(q) for q in sorted(ui.QUANTIZE_CHOICES)]
 
 
+NEEDS_DL = " ⬇"           # marks a dropdown model not present in the local HF cache
+_HF_CACHE = os.path.expanduser("~/.cache/huggingface/hub")
+
+
+def _repo_cached(repo):
+    """True if the model's HuggingFace repo has weights in the local cache."""
+    if not repo or "/" not in str(repo):
+        return False
+    snaps = os.path.join(_HF_CACHE, "models--" + str(repo).replace("/", "--"), "snapshots")
+    if not os.path.isdir(snaps):
+        return False
+    return bool(glob.glob(os.path.join(snaps, "**", "*.safetensors"), recursive=True)
+                or glob.glob(os.path.join(snaps, "**", "*.gguf"), recursive=True))
+
+
+def _is_downloaded(alias):
+    try:
+        _, _, cfg, _ = D.resolve_config_and_path(alias)
+        return _repo_cached(getattr(cfg, "model_name", ""))
+    except Exception:
+        return False
+
+
+def strip_mark(name):
+    """Recover the clean alias from a dropdown label that may carry the NEEDS_DL mark."""
+    return name[:-len(NEEDS_DL)] if name.endswith(NEEDS_DL) else name
+
+
 def model_choices():
-    """Curated dropdown: base txt2img families + the variant/edit families the
-    typed MfluxImage feeder can drive. seedvr2 (upscaler) and multi-image diptych
-    variants (catvton/in-context) are excluded; typed aliases still hard-block
-    cleanly via the sampler's required-arg guard."""
+    """Curated dropdown of the models the sampler can drive (base txt2img + the
+    wired image-conditioned variants; seedvr2/diptych excluded). Locally-downloaded
+    models are listed first with clean names; models not in the HF cache come after,
+    marked with NEEDS_DL so you can see they would trigger a download (gated repos a
+    403). The mark is a best-effort hint and is stripped before loading."""
     allowed = D.BASE_FAMILIES | D.WIRED_VARIANT_FAMILIES
-    seen, out = set(), []
+    seen, have, need = set(), [], []
     for k in list(ui.MODEL_CHOICES) + list(D.ALIAS_DISPATCH) + list(D.DROPDOWN_EXTRA):
         if k in seen or k in D.SEEDVR2_ALIASES:
             continue
         seen.add(k)
         try:
             _, fam = D.pick_model_class(k)
-            if fam in allowed:
-                out.append(k)
+            if fam not in allowed:
+                continue
+            (have if _is_downloaded(k) else need).append(k)
         except Exception:
             pass
-    return out
+    return have + [k + NEEDS_DL for k in need]
 
 
 # --------------------------------------------------------------------------- #
@@ -324,6 +355,7 @@ class MfluxModelLoader:
 
     def load(self, model, quantize, base_model="(none)", model_path="",
              lora=None, keep_loaded=True, free_comfy_first=True):
+        model = strip_mark(model)          # drop the dropdown "needs download" mark
         base = "" if base_model in ("(none)", "") else base_model
         q = None if quantize == "none" else int(quantize)
         lp = [p for p, s in lora] if lora else None
@@ -337,10 +369,20 @@ class MfluxModelLoader:
         else:
             if free_comfy_first:
                 _free_comfy()
-            instance = D.build_model(
-                cls, quantize=q, model_config=cfg, model_path=path,
-                lora_paths=lp, lora_scales=ls, bake_lora=True,
-            )
+            try:
+                instance = D.build_model(
+                    cls, quantize=q, model_config=cfg, model_path=path,
+                    lora_paths=lp, lora_scales=ls, bake_lora=True,
+                )
+            except Exception as e:
+                blob = (type(e).__name__ + " " + str(e)).lower()
+                if any(t in blob for t in ("gated", "restricted", "403", "401")):
+                    raise RuntimeError(
+                        f"'{model}' is gated or not downloaded: mflux tried to fetch it from "
+                        f"HuggingFace and was denied. Request access on its HF page and set "
+                        f"HF_TOKEN, or pick a model shown without the '{NEEDS_DL.strip()}' mark."
+                    ) from e
+                raise
             _CACHE["key"] = cache_key if keep_loaded else None
             _CACHE["model"] = instance if keep_loaded else None
 

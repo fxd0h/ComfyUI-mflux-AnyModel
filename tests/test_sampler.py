@@ -9,11 +9,11 @@ injection (img2img, fill, depth, redux, controlnet, qwen-edit, fibo-edit).
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import mflux_dispatch as D
 import capability as C
-from nodes import normalize_and_validate, model_choices, QUANTIZE_CHOICES
+from nodes import normalize_and_validate, model_choices, QUANTIZE_CHOICES, strip_mark
 
 _checks = 0
 
@@ -143,8 +143,8 @@ for alias, (cls, fam) in D.ALIAS_DISPATCH.items():
 ok(not any("degrade" in n for n in normalize_and_validate(pi, "override", req(), None)[1]), "override 0/0 no warn")
 print("8. anti-drift + override gating OK")
 
-# --- dropdown: base + wired variants in, unwired/seedvr2 out ---
-mc = model_choices()
+# --- dropdown: base + wired variants in, unwired/seedvr2 out (marks stripped) ---
+mc = [strip_mark(m) for m in model_choices()]
 ok("schnell" in mc and "ideogram4" in mc, "base models in dropdown")
 ok("dev-fill" in mc and "dev-kontext" in mc and "qwen-image-edit" in mc, "wired variants in dropdown")
 ok("dev-fill-catvton" not in mc and "dev-controlnet-upscaler" not in mc, "unwired variants excluded")
