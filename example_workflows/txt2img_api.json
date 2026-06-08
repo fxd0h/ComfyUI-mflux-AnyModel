@@ -1,0 +1,26 @@
+{
+  "1": {
+    "class_type": "MfluxModelLoader",
+    "inputs": {
+      "model": "schnell",
+      "quantize": "none"
+    }
+  },
+  "2": {
+    "class_type": "MfluxModelSampler",
+    "inputs": {
+      "model": ["1", 0],
+      "prompt": "a red fox sitting in a snowy forest at dawn, photographic, shallow depth of field",
+      "params_mode": "auto",
+      "seed": 42,
+      "width": 1024,
+      "height": 1024
+    }
+  },
+  "3": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": ["2", 0]
+    }
+  }
+}
