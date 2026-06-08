@@ -38,6 +38,21 @@ try:
 except Exception:
     mm = None
 
+try:
+    import folder_paths
+except Exception:
+    folder_paths = None
+
+
+def _lora_files():
+    """LoRA filenames ComfyUI knows about (from the configured loras dirs)."""
+    if folder_paths is None:
+        return []
+    try:
+        return list(folder_paths.get_filename_list("loras"))
+    except Exception:
+        return []
+
 
 # image-role arg names, by how the MfluxImage payload fills them
 PRIMARY_SCALAR = {"image_path", "controlnet_image_path", "left_image_path"}
@@ -55,14 +70,22 @@ _HF_CACHE = os.path.expanduser("~/.cache/huggingface/hub")
 
 
 def _repo_cached(repo):
-    """True if the model's HuggingFace repo has weights in the local cache."""
+    """True if the model's HuggingFace repo is FULLY cached locally — has weights
+    and no pending .incomplete blobs (a partial/interrupted download still triggers
+    a fetch when selected)."""
     if not repo or "/" not in str(repo):
         return False
-    snaps = os.path.join(_HF_CACHE, "models--" + str(repo).replace("/", "--"), "snapshots")
+    base = os.path.join(_HF_CACHE, "models--" + str(repo).replace("/", "--"))
+    snaps = os.path.join(base, "snapshots")
     if not os.path.isdir(snaps):
         return False
-    return bool(glob.glob(os.path.join(snaps, "**", "*.safetensors"), recursive=True)
-                or glob.glob(os.path.join(snaps, "**", "*.gguf"), recursive=True))
+    has_weights = bool(glob.glob(os.path.join(snaps, "**", "*.safetensors"), recursive=True)
+                       or glob.glob(os.path.join(snaps, "**", "*.gguf"), recursive=True))
+    if not has_weights:
+        return False
+    if glob.glob(os.path.join(base, "blobs", "*.incomplete")):  # partial download
+        return False
+    return True
 
 
 def _is_downloaded(alias):
@@ -112,6 +135,7 @@ class MfluxModelHandle:
     profile: C.CapabilityProfile
     cache_key: tuple
     free_comfy_first: bool = True
+    lora_note: str = ""
 
 
 @dataclass
@@ -289,7 +313,7 @@ class MfluxLora:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "lora_path": ("STRING", {"default": "", "tooltip": "Local file, HF repo, or repo:filename.safetensors"}),
+                "lora_name": (["(none)"] + _lora_files(), {"default": "(none)", "tooltip": "LoRA from your ComfyUI loras folder. It must match the loaded model's architecture (e.g. an Ideogram-4 LoRA only works on ideogram4)."}),
                 "lora_scale": ("FLOAT", {"default": 1.0, "min": -4.0, "max": 4.0, "step": 0.05}),
             },
             "optional": {"lora_in": ("MFLUX_LORA",)},
@@ -300,10 +324,18 @@ class MfluxLora:
     FUNCTION = "build"
     CATEGORY = "MLX/mflux/inputs"
 
-    def build(self, lora_path, lora_scale, lora_in=None):
+    def build(self, lora_name, lora_scale, lora_in=None):
         chain = list(lora_in) if lora_in else []
-        if lora_path.strip():
-            chain.append((lora_path.strip(), float(lora_scale)))
+        if lora_name and lora_name != "(none)":
+            path = lora_name
+            if folder_paths is not None:
+                try:
+                    resolved = folder_paths.get_full_path("loras", lora_name)
+                    if resolved:
+                        path = resolved
+                except Exception:
+                    pass
+            chain.append((path, float(lora_scale)))
         return (chain,)
 
 
@@ -364,6 +396,7 @@ class MfluxModelLoader:
         cls, family, cfg, path = D.resolve_config_and_path(model, base, model_path.strip())
         cache_key = (family, path or model, q, tuple(lp or ()), tuple(ls or ()), base)
 
+        lora_note = ""
         if keep_loaded and _CACHE["key"] == cache_key:
             instance = _CACHE["model"]
         else:
@@ -376,13 +409,25 @@ class MfluxModelLoader:
                 )
             except Exception as e:
                 blob = (type(e).__name__ + " " + str(e)).lower()
-                if any(t in blob for t in ("gated", "restricted", "403", "401")):
+                if "no lora layers were applied" in blob and lp:
+                    # LoRA built for another architecture -> load WITHOUT it and keep going,
+                    # so switching models with a LoRA attached never hard-crashes.
+                    names = ", ".join(os.path.basename(p) for p in lp)
+                    lora_note = (f"[mflux] LoRA [{names}] is incompatible with '{model}' (built for a "
+                                 f"different architecture) — loaded WITHOUT it. Use a LoRA made for '{model}'.")
+                    print(lora_note)
+                    instance = D.build_model(
+                        cls, quantize=q, model_config=cfg, model_path=path,
+                        lora_paths=None, lora_scales=None, bake_lora=True,
+                    )
+                elif any(t in blob for t in ("gated", "restricted", "403", "401")):
                     raise RuntimeError(
                         f"'{model}' is gated or not downloaded: mflux tried to fetch it from "
                         f"HuggingFace and was denied. Request access on its HF page and set "
                         f"HF_TOKEN, or pick a model shown without the '{NEEDS_DL.strip()}' mark."
                     ) from e
-                raise
+                else:
+                    raise
             _CACHE["key"] = cache_key if keep_loaded else None
             _CACHE["model"] = instance if keep_loaded else None
 
@@ -390,6 +435,7 @@ class MfluxModelLoader:
         handle = MfluxModelHandle(
             instance=instance, family=family, model_config=cfg, alias=model,
             profile=profile, cache_key=cache_key, free_comfy_first=free_comfy_first,
+            lora_note=lora_note,
         )
         return (handle,)
 
@@ -473,6 +519,8 @@ class MfluxModelSampler:
                     except Exception:
                         pass
 
+        if getattr(handle, "lora_note", ""):
+            notes = [handle.lora_note] + notes
         info = f"model={handle.alias} family={handle.family} forwarded={sorted(forwarded)}"
         if notes:
             info += "\n" + "\n".join(notes)
