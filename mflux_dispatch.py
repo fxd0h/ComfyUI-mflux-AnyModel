@@ -16,34 +16,52 @@ Verified constructor shapes:
   - FIBO / Ernie:    (quantize, model_path, lora_paths, lora_scales, model_config)   # no bake_lora
   - SeedVR2:         (quantize, model_path, model_config)                            # no lora (own node)
 """
+import importlib
 import inspect
 
 from mflux.models.common.config import ModelConfig
-from mflux.models.flux.variants.txt2img.flux import Flux1
-from mflux.models.flux.variants.kontext.flux_kontext import Flux1Kontext
-from mflux.models.flux.variants.fill.flux_fill import Flux1Fill
-from mflux.models.flux.variants.depth.flux_depth import Flux1Depth
-from mflux.models.flux.variants.redux.flux_redux import Flux1Redux
-from mflux.models.flux.variants.controlnet.flux_controlnet import Flux1Controlnet
-from mflux.models.flux.variants.in_context.flux_in_context_fill import Flux1InContextFill
-from mflux.models.flux2.variants.txt2img.flux2_klein import Flux2Klein
-from mflux.models.flux2.variants.edit.flux2_klein_edit import Flux2KleinEdit
-from mflux.models.qwen.variants.txt2img.qwen_image import QwenImage
-from mflux.models.qwen.variants.edit.qwen_image_edit import QwenImageEdit
-from mflux.models.z_image.variants.z_image import ZImage
-from mflux.models.ideogram4.variants.txt2img.ideogram4 import Ideogram4
-from mflux.models.ideogram4.weights.ideogram4_weight_definition import Ideogram4WeightDefinition
-from mflux.models.fibo.variants.txt2img.fibo import FIBO
-from mflux.models.fibo.variants.edit.fibo_edit import FIBOEdit
-from mflux.models.ernie_image.variants.txt2img.ernie_image import ErnieImage
-from mflux.models.krea2.variants.txt2img.krea2 import Krea2
-from mflux.models.krea2.variants.controlnet.krea2_depth import Krea2Depth
-from mflux.models.boogu.variants.txt2img.boogu_image import BooguImage
+
+
+def _imp(path, name):
+    """Import name from module path, returning None if the installed mflux lacks it.
+
+    The node is fork-agnostic: it drives whatever mflux is installed. Our fork (mflux-CV)
+    ships extra families (Krea 2, Boogu, FLUX.2-Klein edit, ...) that stock upstream mflux
+    does not have. A hard import of those would crash the whole node at load for every
+    registry user on upstream mflux, so each model class is imported defensively and simply
+    absent (None) when the installed mflux does not provide it. Dispatch and the dropdown
+    skip the absent ones."""
+    try:
+        return getattr(importlib.import_module(path), name)
+    except Exception:
+        return None
+
+
+Flux1 = _imp("mflux.models.flux.variants.txt2img.flux", "Flux1")
+Flux1Kontext = _imp("mflux.models.flux.variants.kontext.flux_kontext", "Flux1Kontext")
+Flux1Fill = _imp("mflux.models.flux.variants.fill.flux_fill", "Flux1Fill")
+Flux1Depth = _imp("mflux.models.flux.variants.depth.flux_depth", "Flux1Depth")
+Flux1Redux = _imp("mflux.models.flux.variants.redux.flux_redux", "Flux1Redux")
+Flux1Controlnet = _imp("mflux.models.flux.variants.controlnet.flux_controlnet", "Flux1Controlnet")
+Flux1InContextFill = _imp("mflux.models.flux.variants.in_context.flux_in_context_fill", "Flux1InContextFill")
+Flux2Klein = _imp("mflux.models.flux2.variants.txt2img.flux2_klein", "Flux2Klein")
+Flux2KleinEdit = _imp("mflux.models.flux2.variants.edit.flux2_klein_edit", "Flux2KleinEdit")
+QwenImage = _imp("mflux.models.qwen.variants.txt2img.qwen_image", "QwenImage")
+QwenImageEdit = _imp("mflux.models.qwen.variants.edit.qwen_image_edit", "QwenImageEdit")
+ZImage = _imp("mflux.models.z_image.variants.z_image", "ZImage")
+Ideogram4 = _imp("mflux.models.ideogram4.variants.txt2img.ideogram4", "Ideogram4")
+Ideogram4WeightDefinition = _imp("mflux.models.ideogram4.weights.ideogram4_weight_definition", "Ideogram4WeightDefinition")
+FIBO = _imp("mflux.models.fibo.variants.txt2img.fibo", "FIBO")
+FIBOEdit = _imp("mflux.models.fibo.variants.edit.fibo_edit", "FIBOEdit")
+ErnieImage = _imp("mflux.models.ernie_image.variants.txt2img.ernie_image", "ErnieImage")
+Krea2 = _imp("mflux.models.krea2.variants.txt2img.krea2", "Krea2")
+Krea2Depth = _imp("mflux.models.krea2.variants.controlnet.krea2_depth", "Krea2Depth")
+BooguImage = _imp("mflux.models.boogu.variants.txt2img.boogu_image", "BooguImage")
 
 # Variant aliases that must dispatch to a dedicated class (a plain base-family
 # ladder would route all of these to Flux1 and silently ignore their image inputs).
 # Each entry verified against the CLI entrypoint that instantiates that class.
-ALIAS_DISPATCH = {
+_ALIAS_DISPATCH_RAW = {
     "dev-kontext":              (Flux1Kontext,       "flux-kontext"),    # flux_generate_kontext.py
     "dev-fill":                 (Flux1Fill,          "flux-fill"),       # flux_generate_fill.py
     "dev-fill-catvton":         (Flux1InContextFill, "flux-catvton"),    # flux_generate_in_context_catvton.py
@@ -60,6 +78,8 @@ ALIAS_DISPATCH = {
     "krea-2-depth":             (Krea2Depth,         "krea2-depth"),     # krea2_depth_generate.py
     "krea2-depth":              (Krea2Depth,         "krea2-depth"),     # krea2_depth_generate.py (spelling alias)
 }
+# Drop entries whose class is absent from the installed mflux (upstream lacks fork-only variants).
+ALIAS_DISPATCH = {k: v for k, v in _ALIAS_DISPATCH_RAW.items() if v[0] is not None}
 
 # Aliases handled by dedicated nodes, not the txt2img/edit sampler.
 SEEDVR2_ALIASES = {"seedvr2", "seedvr2-3b", "seedvr2-7b", "seedvr2-7B"}
@@ -83,7 +103,14 @@ WIRED_VARIANT_FAMILIES = {
 }
 # Edit/variant aliases that are valid models but not present in ui.MODEL_CHOICES.
 # (krea-2-depth / krea2-depth come from ALIAS_DISPATCH and already surface in the dropdown.)
-DROPDOWN_EXTRA = ["qwen-image-edit", "flux2-klein-edit", "krea-2", "krea-2-raw"]
+# Only offered when the installed mflux actually provides the backing class.
+DROPDOWN_EXTRA = []
+if QwenImageEdit is not None:
+    DROPDOWN_EXTRA.append("qwen-image-edit")
+if Flux2KleinEdit is not None:
+    DROPDOWN_EXTRA.append("flux2-klein-edit")
+if Krea2 is not None:
+    DROPDOWN_EXTRA += ["krea-2", "krea-2-raw"]
 
 # Families whose image roles are all optional in generate_image but that still need at least
 # one image source at run time (krea2-depth: DepthPro needs a photo, unless a depth map is given).
@@ -91,26 +118,33 @@ NEEDS_ANY_IMAGE = {"krea2-depth"}
 
 
 def pick_base_class(model: str, base_model: str = ""):
-    """Base-family ladder. Order matters (qwen-edit before qwen, turbo via z-image)."""
+    """Base-family ladder. Order matters (qwen-edit before qwen, turbo via z-image).
+
+    Each fork-only family is guarded on its class being available in the installed mflux;
+    when absent, the model falls through (ultimately to Flux1) rather than routing to a None."""
     m, b = model.lower(), (base_model or "").lower()
-    if "ernie" in m:
+    if ErnieImage is not None and "ernie" in m:
         return ErnieImage, "ernie"
     # Krea 2 (krea-2 / krea2), NOT Flux.1 Krea ("krea-dev" / "dev-krea", handled by the Flux1 fallback).
-    if ("krea-2" in m or "krea2" in m) and "dev" not in m:
+    if Krea2 is not None and ("krea-2" in m or "krea2" in m) and "dev" not in m:
         return Krea2, "krea2"
-    if "boogu" in m:
+    if BooguImage is not None and "boogu" in m:
         return BooguImage, "boogu"
-    if "qwen" in m and "edit" in m:
+    if QwenImageEdit is not None and "qwen" in m and "edit" in m:
         return QwenImageEdit, "qwen-edit"
-    if "qwen" in m:
+    if QwenImage is not None and "qwen" in m:
         return QwenImage, "qwen"
-    if "fibo" in m:
+    if FIBO is not None and "fibo" in m:
         return FIBO, "fibo"
-    if "z-image" in m or "zimage" in m:        # z-image-turbo also routes to ZImage
+    if ZImage is not None and ("z-image" in m or "zimage" in m):   # z-image-turbo also routes to ZImage
         return ZImage, "z-image"
-    if "flux2" in m or "flux.2" in m or "klein" in m:   # klein-* are FLUX.2, not Flux1
-        return (Flux2KleinEdit, "flux2-edit") if "edit" in m else (Flux2Klein, "flux2")
-    if "ideogram" in m or "ideogram" in b:
+    if (Flux2Klein is not None or Flux2KleinEdit is not None) and ("flux2" in m or "flux.2" in m or "klein" in m):
+        if "edit" in m and Flux2KleinEdit is not None:
+            return Flux2KleinEdit, "flux2-edit"
+        if Flux2Klein is not None:
+            return Flux2Klein, "flux2"
+        return Flux2KleinEdit, "flux2-edit"
+    if Ideogram4 is not None and ("ideogram" in m or "ideogram" in b):
         return Ideogram4, "ideogram4"
     return Flux1, "flux"
 

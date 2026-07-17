@@ -5,7 +5,10 @@ on:
   pull_request:
 
 jobs:
+  # Supported config: the fork (mflux-CV) that ships every family the node drives.
+  # The full self-tests assert fork behavior (Krea 2, Boogu, FLUX.2-Klein edit, redux).
   selftests:
+    name: self-tests (mflux-CV fork)
     # Apple Silicon runner: mflux/MLX require arm64 macOS.
     runs-on: macos-14
     steps:
@@ -13,9 +16,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install mflux
-        run: pip install "mflux>=0.18.0"
+      - name: Install mflux-CV fork
+        run: pip install "mflux @ git+https://github.com/HowDidTheCatGetSoFat/mflux-cv.git@main"
       - name: Dispatch + capability self-tests
         run: python tests/test_dispatch.py
       - name: Sampler self-tests
         run: python tests/test_sampler.py
+      - name: Upstream-compatibility smoke test
+        run: python tests/smoke_import.py
+
+  # Registry config: stock upstream mflux from PyPI (what a ComfyUI Manager user gets).
+  # The node MUST load and degrade gracefully without the fork-only families.
+  smoke-upstream:
+    name: smoke (stock mflux from PyPI)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install stock mflux
+        run: pip install "mflux>=0.18.0"
+      - name: Node loads on stock mflux (no fork models)
+        run: python tests/smoke_import.py

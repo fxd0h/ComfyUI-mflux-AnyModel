@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.4.1]
+
+### Fixed
+- **The node now loads on stock (non-fork) mflux.** Model classes for the fork-only families
+  (Krea 2, Boogu, FLUX.2-Klein edit, and any others a given mflux lacks) are imported defensively
+  and are simply absent when the installed mflux does not provide them, instead of a hard import
+  that crashed the whole node at ComfyUI load for every user on upstream mflux from PyPI. Dispatch,
+  the dropdown, and the alias table skip the absent families; base models are unaffected.
+
+### CI
+- The self-test job now installs the mflux-CV fork (the supported config that ships every family
+  the node drives). A second job installs stock mflux from PyPI and runs an import smoke test, so
+  the "node loads on upstream" contract is verified on every push. Added `tests/smoke_import.py`.
+
 ## [0.4.0]
 
 ### Added
