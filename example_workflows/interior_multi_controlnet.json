@@ -1,0 +1,59 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "room_depth.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "room.png"
+    }
+  },
+  "3": {
+    "class_type": "MfluxModelLoader",
+    "inputs": {
+      "model": "dev-controlnet-canny",
+      "quantize": "8",
+      "controlnet_path": "Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0\nInstantX/FLUX.1-dev-Controlnet-Canny",
+      "keep_loaded": true,
+      "free_comfy_first": true
+    }
+  },
+  "4": {
+    "class_type": "MfluxImage",
+    "inputs": {
+      "image": ["1", 0],
+      "strength": 0.65
+    }
+  },
+  "5": {
+    "class_type": "MfluxImage",
+    "inputs": {
+      "image": ["2", 0],
+      "image_in": ["4", 0],
+      "strength": 0.35
+    }
+  },
+  "6": {
+    "class_type": "MfluxModelSampler",
+    "inputs": {
+      "model": ["3", 0],
+      "mflux_image": ["5", 0],
+      "prompt": "a warm modern living room, dark walnut floor, cream walls, framed art, soft daylight",
+      "params_mode": "auto",
+      "seed": 11,
+      "steps": 8,
+      "guidance": 3.5,
+      "width": 768,
+      "height": 768
+    }
+  },
+  "7": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": ["6", 0]
+    }
+  }
+}

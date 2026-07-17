@@ -103,6 +103,14 @@ this palette, 30% that". Redux generates a new image in the referenced style rat
 restyling one specific room, so use it for direction and inspiration, and the depth path
 above when you need to keep an exact room's geometry. See `interior_redux_moodboard.json`.
 
+**Geometry lock with stacked ControlNets (FLUX.1).** Put one checkpoint per line in the
+loader's `controlnet_path` to stack several controlnets, then chain one `mflux Image` per
+net, in the same order, each carrying that net's control image and `strength`. Stacking
+`Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0` (feed it a depth map) with
+`InstantX/FLUX.1-dev-Controlnet-Canny` (feed it the photo; the canny is derived for you)
+holds a room's layout while the prompt restyles its materials. Needs mflux-CV >= 0.18.25.
+See `interior_multi_controlnet.json`.
+
 **Regional restyle (restyle only the floor, keep the windows).** `mflux Auto Mask` segments
 the room with an ADE20K model and turns a named region into a mask, so you can restyle one
 surface without hand-painting. Wire it into `mflux Image` -> mask, then on the sampler pick

@@ -213,4 +213,25 @@ ok(fwd.get("redux_image_strengths") == [1.0, 0.7, 0.3], f"redux_image_strengths 
 ok("image_strength" not in fwd, "redux: bare image_strength (init blend) must NOT be forced")
 print("12. redux multi-reference per-image strength OK")
 
+# --- 13. multi-ControlNet stacking through the node ---
+pcn = prof("dev-controlnet-canny")
+# one controlnet: the scalar shape is unchanged
+fwd, _ = normalize_and_validate(pcn, "auto", req(), img(primary="/tmp/c.png", strength=0.8))
+ok(fwd.get("controlnet_image_path") == "/tmp/c.png", "single controlnet keeps the scalar image path")
+ok(fwd.get("controlnet_strength") == 0.8, "single controlnet keeps the scalar strength")
+# a stack: one control image per net, each with its own strength, in chain order
+stack = {"primary": "/tmp/depth.png", "primaries": ["/tmp/depth.png", "/tmp/canny.png"],
+         "mask": None, "aux": None, "strength": 0.65, "strengths": [0.65, 0.35]}
+fwd, _ = normalize_and_validate(pcn, "auto", req(), stack)
+ok(fwd.get("controlnet_image_path") == ["/tmp/depth.png", "/tmp/canny.png"], "stack passes one control image per net")
+ok(fwd.get("controlnet_strength") == [0.65, 0.35], f"stack passes a strength per net, got {fwd.get('controlnet_strength')}")
+# a stack of images must NOT turn other scalar roles into lists (img2img stays scalar)
+pi2i = prof("dev")
+fwd, _ = normalize_and_validate(pi2i, "auto", req(), stack)
+ok(fwd.get("image_path") == "/tmp/depth.png", "img2img keeps the primary only, never a list")
+# the loader only offers stacking where mflux supports it
+ok(D.supports_controlnet_stack(D.pick_model_class("dev-controlnet-canny")[0]), "flux-controlnet can stack")
+ok(not D.supports_controlnet_stack(D.pick_model_class("krea-2-depth")[0]), "krea2-depth takes a single checkpoint")
+print("13. multi-ControlNet stacking (list per net, scalar when single) OK")
+
 print(f"\nALL SELF-TESTS PASSED ({_checks} checks)")

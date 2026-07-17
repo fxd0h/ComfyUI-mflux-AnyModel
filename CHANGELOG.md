@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.6.0]
+
+### Added
+- **Multi-ControlNet stacking** (needs mflux-CV >= 0.18.25). Put **one checkpoint per line** in the
+  loader's `controlnet_path` (a local path or an HF repo) to stack several controlnets on
+  `flux-controlnet`, then chain one `mflux Image` per net, in the same order, each carrying that
+  net's control image and `strength`. mflux sums their residuals, so nets with different block
+  counts stack correctly. A single checkpoint behaves exactly as before.
+  Example: `Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0` (depth) + `InstantX/FLUX.1-dev-Controlnet-Canny`
+  holds a room's geometry while the prompt restyles its materials. See `interior_multi_controlnet.json`.
+- Stacking is offered only where mflux supports it; asking for several checkpoints on a
+  single-checkpoint model (`krea-2-depth`, which is input-concat) fails with a clear message, as does
+  a path that is neither a local file nor an HF repo id.
+
 ## [0.5.0]
 
 ### Added

@@ -207,6 +207,12 @@ def resolve_config_and_path(model: str, base_model: str = "", model_path: str = 
     return cls, family, cfg, path
 
 
+def supports_controlnet_stack(cls) -> bool:
+    """True if the class can load several controlnets at once (its __init__ takes controlnet_paths).
+    Flux1Controlnet sums their residuals; Krea2Depth is input-concat and takes a single checkpoint."""
+    return "controlnet_paths" in inspect.signature(cls.__init__).parameters
+
+
 def requires_controlnet_path(cls) -> bool:
     """True if the class's __init__ makes controlnet_path a required arg (no default).
     Krea2Depth requires it (the depth-control checkpoint); Flux1Controlnet defaults it to None."""
@@ -216,7 +222,7 @@ def requires_controlnet_path(cls) -> bool:
 
 def build_kwargs(cls, *, quantize=None, model_config=None, model_path=None,
                  lora_paths=None, lora_scales=None, bake_lora=True,
-                 controlnet_path=None, controlnet_strength=None):
+                 controlnet_path=None, controlnet_paths=None, controlnet_strength=None):
     """Filter constructor kwargs to those the class's __init__ actually accepts.
 
     This is what makes the loader uniform across heterogeneous constructors
@@ -238,7 +244,10 @@ def build_kwargs(cls, *, quantize=None, model_config=None, model_path=None,
         kw["lora_scales"] = lora_scales
     if "bake_lora" in params and bake_lora is not None:
         kw["bake_lora"] = bake_lora
-    if "controlnet_path" in params:
+    if "controlnet_paths" in params and controlnet_paths:
+        kw["controlnet_paths"] = list(controlnet_paths)
+    elif "controlnet_path" in params:
+        # Single-checkpoint classes (Krea2Depth) only take the singular form.
         kw["controlnet_path"] = controlnet_path
     if "controlnet_strength" in params and controlnet_strength is not None:
         kw["controlnet_strength"] = controlnet_strength

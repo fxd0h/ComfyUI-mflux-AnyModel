@@ -250,9 +250,16 @@ def inject_image(profile, out, paths, gen):
     """Fill the model's real image-role args from a materialized payload of paths
     {primary, mask, aux, strength}. Driven by profile.image_role_args, so each
     family gets exactly the args its generate_image declares."""
+    primaries = list(paths.get("primaries") or [paths["primary"]])
     for arg, req in profile.image_role_args.items():
         if arg in PRIMARY_SCALAR:
-            out[arg] = paths["primary"]
+            # A stack of controlnets takes one control image each, in the order of the MfluxImage
+            # chain; mflux accepts a list here and pairs it with the checkpoints. Every other scalar
+            # role (img2img, diptych) keeps taking just the primary.
+            if arg == "controlnet_image_path" and len(primaries) > 1:
+                out[arg] = primaries
+            else:
+                out[arg] = paths["primary"]
         elif arg in PRIMARY_LIST:
             out[arg] = list(paths.get("primaries") or [paths["primary"]])
         elif arg in MASK_ARGS:
@@ -273,6 +280,11 @@ def inject_image(profile, out, paths, gen):
             # partial img2img (observed: flux2-edit/qwen-edit reinterpret the scene entirely). Apply it
             # only for real img2img (scalar image_path). controlnet_strength is unaffected.
             if arg == "image_strength" and "image_path" not in roles:
+                continue
+            # A stacked controlnet gets one strength per net, from the MfluxImage chain.
+            if arg == "controlnet_strength" and len(primaries) > 1:
+                per_image = paths.get("strengths")
+                out[arg] = [float(s) for s in per_image] if per_image else [float(strength)] * len(primaries)
                 continue
             out[arg] = float(strength)
         for arg in gen & STRENGTH_LIST:       # redux_image_strengths — one per reference image
@@ -440,8 +452,8 @@ class MfluxModelLoader:
                 "base_model": (["(none)"] + list(ui.MODEL_CHOICES), {"default": "(none)"}),
                 "model_path": ("STRING", {"default": "", "tooltip": "HF org/model or local path; overrides 'model' as the load target."}),
                 "lora": ("MFLUX_LORA",),
-                "controlnet_path": ("STRING", {"default": "", "tooltip": "Local path to a ControlNet checkpoint. REQUIRED for krea-2-depth (the depth-control checkpoint); optional for flux-controlnet (a custom controlnet)."}),
-                "controlnet_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Krea-2-depth only: scales the control deltas merged into the base weights at load time. (flux-controlnet reads its strength from the sampler instead.)"}),
+                "controlnet_path": ("STRING", {"multiline": True, "default": "", "tooltip": "ControlNet checkpoint: a local path or an HF repo. REQUIRED for krea-2-depth (the depth-control checkpoint). On flux-controlnet you can STACK several by putting ONE PER LINE (e.g. a depth net and a canny net); then chain one MfluxImage per controlnet, in the same order, each with its own strength."}),
+                "controlnet_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Krea-2-depth only: scales the control deltas merged into the base weights at load time. (flux-controlnet takes a strength per controlnet from the MfluxImage chain instead.)"}),
                 "keep_loaded": ("BOOLEAN", {"default": True}),
                 "free_comfy_first": ("BOOLEAN", {"default": True}),
             },
@@ -460,21 +472,29 @@ class MfluxModelLoader:
         q = None if quantize == "none" else int(quantize)
         lp = [p for p, s in lora] if lora else None
         ls = [s for p, s in lora] if lora else None
-        cn_path = controlnet_path.strip() or None
+        # One checkpoint per line, so several controlnets can be stacked (mflux sums their residuals).
+        cn_paths = [ln.strip() for ln in controlnet_path.splitlines() if ln.strip()]
 
         cls, family, cfg, path = D.resolve_config_and_path(model, base, model_path.strip())
 
         # Fail early with a clear message rather than an opaque TypeError from the constructor.
-        if D.requires_controlnet_path(cls) and not cn_path:
+        if D.requires_controlnet_path(cls) and not cn_paths:
             raise ValueError(
                 f"'{model}' is a ControlNet model and needs a checkpoint — set 'controlnet_path' "
                 f"on the loader to the local depth-control checkpoint."
             )
-        if cn_path and not os.path.exists(cn_path):
-            raise ValueError(f"controlnet_path does not exist: {cn_path}")
+        if len(cn_paths) > 1 and not D.supports_controlnet_stack(cls):
+            raise ValueError(
+                f"'{model}' takes a single ControlNet checkpoint, but {len(cn_paths)} were given "
+                f"(one per line). Stacking is supported on flux-controlnet."
+            )
+        for p in cn_paths:
+            # An HF repo (org/name) is resolved on load; anything else must be a real local path.
+            if not os.path.exists(p) and not (p.count("/") == 1 and not p.startswith((".", "/", "~"))):
+                raise ValueError(f"controlnet_path does not exist and is not an HF repo id: {p}")
 
         cache_key = (family, path or model, q, tuple(lp or ()), tuple(ls or ()), base,
-                     cn_path or "", float(controlnet_strength))
+                     tuple(cn_paths), float(controlnet_strength))
 
         lora_note = ""
         if keep_loaded and _CACHE["key"] == cache_key:
@@ -486,7 +506,8 @@ class MfluxModelLoader:
                 instance = D.build_model(
                     cls, quantize=q, model_config=cfg, model_path=path,
                     lora_paths=lp, lora_scales=ls, bake_lora=True,
-                    controlnet_path=cn_path, controlnet_strength=float(controlnet_strength),
+                    controlnet_paths=cn_paths, controlnet_path=cn_paths[0] if cn_paths else None,
+                    controlnet_strength=float(controlnet_strength),
                 )
             except Exception as e:
                 blob = (type(e).__name__ + " " + str(e)).lower()
@@ -500,7 +521,8 @@ class MfluxModelLoader:
                     instance = D.build_model(
                         cls, quantize=q, model_config=cfg, model_path=path,
                         lora_paths=None, lora_scales=None, bake_lora=True,
-                        controlnet_path=cn_path, controlnet_strength=float(controlnet_strength),
+                        controlnet_paths=cn_paths, controlnet_path=cn_paths[0] if cn_paths else None,
+                        controlnet_strength=float(controlnet_strength),
                     )
                 elif any(t in blob for t in ("gated", "restricted", "403", "401")):
                     raise RuntimeError(

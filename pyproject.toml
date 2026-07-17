@@ -1,12 +1,12 @@
 [project]
 name = "comfyui-mflux-anymodel"
-version = "0.5.0"
+version = "0.6.0"
 description = "Run any mflux/MLX model in ComfyUI on Apple Silicon, with a capability registry that forwards only the parameters each model accepts."
 authors = [{ name = "Mariano Abad" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["mflux>=0.18.0"]
+dependencies = ["mflux>=0.18.0"]  # multi-ControlNet stacking needs mflux-CV >= 0.18.25
 
 [project.urls]
 Repository = "https://github.com/fxd0h/ComfyUI-mflux-AnyModel"
