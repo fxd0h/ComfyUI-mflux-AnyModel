@@ -173,6 +173,13 @@ def resolve_config_and_path(model: str, base_model: str = "", model_path: str = 
     ModelConfig.from_name. Builtin alias -> path None; HF repo / local path -> path.
     """
     cls, family = pick_model_class(model, base_model)
+    if Flux1Redux is not None and cls is Flux1Redux and not model_path:
+        # The FLUX.1-Redux-dev repo is adapter-only (SigLIP + embedder, no base weights). mflux
+        # loads the redux adapter from there automatically but needs the base FLUX transformer/vae/
+        # text-encoders from model_path; without one it wrongly looks for a vae in the adapter repo.
+        # Default the base to FLUX.1-dev (an explicit model_path still wins via the guard above).
+        cfg = ModelConfig.from_name(model, base_model=base_model or None)
+        return cls, family, cfg, "black-forest-labs/FLUX.1-dev"
     if cls is Krea2Depth:
         # krea2-depth is not a ModelConfig alias (from_name would fail); it always runs on the
         # base Krea 2 config, same as the CLI. The depth-control checkpoint arrives via controlnet_path.

@@ -47,9 +47,14 @@ dropdown = [m for m in (list(ui.MODEL_CHOICES) + list(AVAILABLE_MODELS))
 for alias in dropdown:
     cls, family, cfg, path = D.resolve_config_and_path(alias)
     ok(cls is not None and cfg is not None, f"{alias} did not resolve")
-    ok(path is None, f"builtin {alias} should resolve to path None, got {path!r}")
+    # dev-redux is the exception: its HF repo is adapter-only, so it resolves to the FLUX.1-dev
+    # base path rather than None (mflux loads the redux adapter separately).
+    if family == "flux-redux":
+        ok(path == "black-forest-labs/FLUX.1-dev", f"redux base path, got {path!r}")
+    else:
+        ok(path is None, f"builtin {alias} should resolve to path None, got {path!r}")
     ok(D.is_builtin_name(alias) or alias == "ideogram4", f"{alias} not detected builtin")
-print(f"2. all {len(dropdown)} builtin aliases resolve (class+config, path=None) OK")
+print(f"2. all {len(dropdown)} builtin aliases resolve (class+config, path as expected) OK")
 
 # ---- 3. constructor-kwarg adaptation (pure, no weight load) ----
 kw_ideo = D.build_kwargs(Ideogram4, quantize=8, bake_lora=True, lora_paths=["x"], lora_scales=[1.0])
@@ -80,6 +85,15 @@ ok("bake_lora" not in kw_kd, "Krea2Depth has no bake_lora arg")
 ok("krea2-depth" in D.WIRED_VARIANT_FAMILIES, "krea2-depth must be a wired variant family")
 ok("krea2-depth" in D.NEEDS_ANY_IMAGE, "krea2-depth must be flagged as needing an image source")
 print("3b. krea2-depth wiring (controlnet_path required, krea2 config, strength passthrough) OK")
+
+# ---- 3c. dev-redux base resolution (adapter-only repo needs the FLUX.1-dev base) ----
+_, fam_rdx, _, path_rdx = D.resolve_config_and_path("dev-redux")
+ok(fam_rdx == "flux-redux", "dev-redux family")
+ok(path_rdx == "black-forest-labs/FLUX.1-dev", f"dev-redux base must default to FLUX.1-dev, got {path_rdx!r}")
+# an explicit model_path still wins (bring-your-own base)
+_, _, _, path_rdx2 = D.resolve_config_and_path("dev-redux", model_path="/my/local/flux")
+ok(path_rdx2 == "/my/local/flux", "explicit model_path overrides the default redux base")
+print("3c. dev-redux base defaults to FLUX.1-dev (adapter-only repo) OK")
 
 # ---- 4. capability profiles (introspection + small tables) ----
 def prof(alias_or_cls, family=None):

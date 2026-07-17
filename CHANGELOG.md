@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.4.2]
+
+### Fixed
+- **`dev-redux` now loads.** The FLUX.1-Redux-dev HuggingFace repo is adapter-only (SigLIP encoder
+  plus the redux embedder, no base transformer/VAE/text-encoders), so selecting it failed with a
+  missing-VAE error because the base was looked for in the adapter repo. The loader now defaults the
+  redux base to `black-forest-labs/FLUX.1-dev` (an explicit `model_path` still wins). Validated
+  end to end: a two-reference blend with distinct per-image strengths renders in the referenced style.
+
 ## [0.4.1]
 
 ### Fixed
