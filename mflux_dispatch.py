@@ -54,6 +54,11 @@ ALIAS_DISPATCH = {
     "dev-controlnet-upscaler":  (Flux1Controlnet,    "flux-upscaler"),   # flux_upscale.py (is controlnet)
     "fibo-edit":                (FIBOEdit,           "fibo-edit"),       # fibo_edit.py (not txt2img FIBO)
     "fibo-edit-rmbg":           (FIBOEdit,           "fibo-edit"),       # fibo_edit.py
+    # Krea 2 depth-ControlNet (krea2_depth_generate.py). Needs a controlnet_path (the depth-control
+    # checkpoint) supplied on the loader; routes here only via these explicit aliases so plain
+    # "krea-2" still lands on txt2img Krea2.
+    "krea-2-depth":             (Krea2Depth,         "krea2-depth"),     # krea2_depth_generate.py
+    "krea2-depth":              (Krea2Depth,         "krea2-depth"),     # krea2_depth_generate.py (spelling alias)
 }
 
 # Aliases handled by dedicated nodes, not the txt2img/edit sampler.
@@ -70,15 +75,19 @@ BASE_FAMILIES = {"flux", "qwen", "z-image", "ideogram4", "fibo", "ernie", "flux2
 # Variant/edit families the sampler drives via the typed MfluxImage feeder (primary +
 # optional mask + optional depth/control map + multi-image). catvton and the in-context
 # diptych variants are left out (multi-image diptych roles the feeder does not model).
-# NOTE: krea2-depth (Krea2Depth) resolves but needs a required controlnet_path (the depth-control
-# checkpoint) that the loader does not yet expose as an input — TODO: add a controlnet_path UI. Until
-# then it is not offered (no dropdown alias routes to it) and stays out of the wired set.
+# krea2-depth is wired now that the loader exposes controlnet_path (+ controlnet_strength):
+# feed a room photo on 'image' (DepthPro auto-derives the depth) or a precomputed depth on 'map_image'.
 WIRED_VARIANT_FAMILIES = {
     "flux-kontext", "flux-fill", "flux-depth", "flux-redux", "flux-controlnet",
-    "qwen-edit", "fibo-edit", "flux2-edit",
+    "qwen-edit", "fibo-edit", "flux2-edit", "krea2-depth",
 }
 # Edit/variant aliases that are valid models but not present in ui.MODEL_CHOICES.
+# (krea-2-depth / krea2-depth come from ALIAS_DISPATCH and already surface in the dropdown.)
 DROPDOWN_EXTRA = ["qwen-image-edit", "flux2-klein-edit", "krea-2", "krea-2-raw"]
+
+# Families whose image roles are all optional in generate_image but that still need at least
+# one image source at run time (krea2-depth: DepthPro needs a photo, unless a depth map is given).
+NEEDS_ANY_IMAGE = {"krea2-depth"}
 
 
 def pick_base_class(model: str, base_model: str = ""):
@@ -130,6 +139,12 @@ def resolve_config_and_path(model: str, base_model: str = "", model_path: str = 
     ModelConfig.from_name. Builtin alias -> path None; HF repo / local path -> path.
     """
     cls, family = pick_model_class(model, base_model)
+    if cls is Krea2Depth:
+        # krea2-depth is not a ModelConfig alias (from_name would fail); it always runs on the
+        # base Krea 2 config, same as the CLI. The depth-control checkpoint arrives via controlnet_path.
+        cfg = ModelConfig.krea2()
+        path = model_path or None
+        return cls, family, cfg, path
     if cls is Ideogram4:
         cfg = Ideogram4WeightDefinition.resolve_inference_config(model, base_model or "", model_path or None)
         if model_path:                       # honor an explicit path over the builtin alias
@@ -151,12 +166,21 @@ def resolve_config_and_path(model: str, base_model: str = "", model_path: str = 
     return cls, family, cfg, path
 
 
+def requires_controlnet_path(cls) -> bool:
+    """True if the class's __init__ makes controlnet_path a required arg (no default).
+    Krea2Depth requires it (the depth-control checkpoint); Flux1Controlnet defaults it to None."""
+    p = inspect.signature(cls.__init__).parameters.get("controlnet_path")
+    return p is not None and p.default is inspect.Parameter.empty
+
+
 def build_kwargs(cls, *, quantize=None, model_config=None, model_path=None,
-                 lora_paths=None, lora_scales=None, bake_lora=True, controlnet_path=None):
+                 lora_paths=None, lora_scales=None, bake_lora=True,
+                 controlnet_path=None, controlnet_strength=None):
     """Filter constructor kwargs to those the class's __init__ actually accepts.
 
     This is what makes the loader uniform across heterogeneous constructors
-    (bake_lora absent on Ideogram/FIBO/Ernie, controlnet_path only on controlnet).
+    (bake_lora absent on Ideogram/FIBO/Ernie, controlnet_path only on controlnet models,
+    controlnet_strength a constructor arg on Krea2Depth but a generate_image arg on Flux1Controlnet).
     Pure / no side effects, so it is unit-testable without loading weights.
     """
     params = set(inspect.signature(cls.__init__).parameters)
@@ -175,6 +199,8 @@ def build_kwargs(cls, *, quantize=None, model_config=None, model_path=None,
         kw["bake_lora"] = bake_lora
     if "controlnet_path" in params:
         kw["controlnet_path"] = controlnet_path
+    if "controlnet_strength" in params and controlnet_strength is not None:
+        kw["controlnet_strength"] = controlnet_strength
     return kw
 
 

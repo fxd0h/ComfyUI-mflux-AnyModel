@@ -150,6 +150,48 @@ ok("dev-fill" in mc and "dev-kontext" in mc and "qwen-image-edit" in mc, "wired 
 ok("dev-fill-catvton" not in mc and "dev-controlnet-upscaler" not in mc, "unwired variants excluded")
 ok(not any(s in mc for s in D.SEEDVR2_ALIASES), "seedvr2 excluded")
 ok("none" in QUANTIZE_CHOICES and "8" in QUANTIZE_CHOICES, "quantize choices")
+ok("krea-2-depth" in mc, "krea2-depth (controlnet) must be in the dropdown now that controlnet_path is wired")
 print("9. dropdown (base + wired variants) OK")
+
+# --- 10. krea2-depth image-role injection + needs-any-image gating ---
+pkd = prof("krea-2-depth")
+ok(pkd.image_role_args == {"image_path": "opt", "depth_image_path": "opt"}, "krea2-depth roles: image_path + depth_image_path, both opt")
+ok(not pkd.needs_image, "krea2-depth has no strictly-required image role")
+# a room photo alone -> image_path filled (DepthPro derives depth), no image_strength forced
+fwd, _ = normalize_and_validate(pkd, "auto", req(), img(primary="/tmp/room.png"))
+ok(fwd.get("image_path") == "/tmp/room.png", "krea2-depth: primary photo -> image_path")
+ok("image_strength" not in fwd, "krea2-depth: image_strength must NOT be forced (not in signature)")
+# a precomputed depth map on aux -> depth_image_path
+fwd, _ = normalize_and_validate(pkd, "auto", req(), img(primary="/tmp/room.png", aux="/tmp/depth.png"))
+ok(fwd.get("depth_image_path") == "/tmp/depth.png", "krea2-depth: aux map -> depth_image_path")
+# no image at all -> NEEDS_ANY_IMAGE hard-blocks
+try:
+    normalize_and_validate(pkd, "auto", req(), None)
+    ok(False, "krea2-depth with no image must raise")
+except ValueError:
+    ok(True, "krea2-depth with no image hard-blocks cleanly")
+print("10. krea2-depth injection + needs-any-image gating OK")
+
+# --- 11. mask-preserve composite helpers ---
+import numpy as np
+import torch
+from nodes import _preserve_composite, _mask_to_gray01
+from PIL import Image
+orig = torch.zeros(1, 8, 8, 3)                       # black original
+edited = Image.new("RGB", (8, 8), (255, 255, 255))   # white edit
+mask = torch.zeros(1, 8, 8, 3)                        # left half white = "keep original there"
+mask[:, :, :4, :] = 1.0
+# preserve (white=keep original): left half stays black (0), right half takes the white edit (1)
+out = _preserve_composite(orig, edited, mask, keep_white=True, feather=0)[0].numpy()
+ok(out[0, 0, 0] < 0.5, "preserve: white(masked) area kept from black original")
+ok(out[0, 7, 0] > 0.5, "preserve: unmasked area took the white edit")
+# inpaint (white=take edit): polarity flips
+out2 = _preserve_composite(orig, edited, mask, keep_white=False, feather=0)[0].numpy()
+ok(out2[0, 0, 0] > 0.5, "inpaint: white(masked) area took the edit")
+ok(out2[0, 7, 0] < 0.5, "inpaint: unmasked area kept from black original")
+# mask resizing + a MASK-shaped (B,H,W) tensor both work
+g = _mask_to_gray01(torch.ones(1, 4, 4), 8, 8, 0)
+ok(g.shape == (8, 8) and g.mean() > 0.9, "mask (B,H,W) resizes to target and stays white")
+print("11. mask-preserve composite (preserve/inpaint polarity, resize, MASK shape) OK")
 
 print(f"\nALL SELF-TESTS PASSED ({_checks} checks)")

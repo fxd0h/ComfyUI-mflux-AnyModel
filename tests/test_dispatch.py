@@ -34,10 +34,11 @@ def ok(cond, msg):
 
 # ---- 1. dispatch: no variant alias silently degrades to a base txt2img class ----
 _BASE_TXT2IMG = {Flux1, FIBO}  # the classes a flux-/fibo- variant would wrongly fall back to
+_VARIANT_FAMILY_PREFIXES = ("flux-", "fibo-", "krea2-")
 for alias in D.ALIAS_DISPATCH:
     cls, family = D.pick_model_class(alias)
     ok(cls not in _BASE_TXT2IMG, f"{alias} degraded to a base txt2img class (trap reintroduced)")
-    ok(family.startswith("flux-") or family.startswith("fibo-"), f"{alias} family={family} unexpected")
+    ok(family.startswith(_VARIANT_FAMILY_PREFIXES), f"{alias} family={family} unexpected")
 print("1. variant aliases dispatch to dedicated classes (no txt2img degradation) OK")
 
 # ---- 2. every dropdown-eligible alias resolves to a config + class ----
@@ -60,6 +61,25 @@ ok("bake_lora" in kw_cn, "Flux1Controlnet must receive bake_lora")
 kw_flux = D.build_kwargs(Flux1)
 ok("controlnet_path" not in kw_flux, "Flux1 must NOT receive controlnet_path")
 print("3. build_kwargs adapts to each constructor (ideo no bake_lora, cn has controlnet_path) OK")
+
+# ---- 3b. krea2-depth controlnet wiring ----
+from mflux.models.krea2.variants.controlnet.krea2_depth import Krea2Depth
+from mflux.models.krea2.variants.txt2img.krea2 import Krea2
+cls_kd, fam_kd = D.pick_model_class("krea-2-depth")
+ok(cls_kd is Krea2Depth and fam_kd == "krea2-depth", "krea-2-depth must dispatch to Krea2Depth")
+ok(D.pick_model_class("krea2-depth")[0] is Krea2Depth, "krea2-depth spelling alias must dispatch to Krea2Depth")
+ok(D.pick_model_class("krea-2")[0] is Krea2, "plain krea-2 must STILL be txt2img Krea2, not depth")
+ok(D.requires_controlnet_path(Krea2Depth), "Krea2Depth must require controlnet_path")
+ok(not D.requires_controlnet_path(Flux1Controlnet), "Flux1Controlnet controlnet_path is optional")
+_, _, cfg_kd, path_kd = D.resolve_config_and_path("krea-2-depth")
+ok(cfg_kd is not None and path_kd is None, "krea-2-depth resolves to the krea2 config, path None")
+kw_kd = D.build_kwargs(Krea2Depth, controlnet_path="ckpt", controlnet_strength=0.8, bake_lora=True)
+ok(kw_kd.get("controlnet_path") == "ckpt", "Krea2Depth must receive controlnet_path")
+ok(kw_kd.get("controlnet_strength") == 0.8, "Krea2Depth must receive controlnet_strength (constructor arg)")
+ok("bake_lora" not in kw_kd, "Krea2Depth has no bake_lora arg")
+ok("krea2-depth" in D.WIRED_VARIANT_FAMILIES, "krea2-depth must be a wired variant family")
+ok("krea2-depth" in D.NEEDS_ANY_IMAGE, "krea2-depth must be flagged as needing an image source")
+print("3b. krea2-depth wiring (controlnet_path required, krea2 config, strength passthrough) OK")
 
 # ---- 4. capability profiles (introspection + small tables) ----
 def prof(alias_or_cls, family=None):

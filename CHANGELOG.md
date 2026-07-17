@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.3.0]
+
+### Added
+- **Krea 2 depth ControlNet** (`krea-2-depth`): pick it in the loader, point `controlnet_path`
+  at the depth-control checkpoint, and feed a room photo on `mflux Image`. DepthPro derives the
+  depth automatically and the render keeps the room's layout while restyling it. A precomputed
+  depth can be supplied instead on `map_image`. This is the geometry-lock path for interior
+  renovation, where preserving room volume while changing materials/furniture is the whole point.
+- **Loader `controlnet_path` + `controlnet_strength`** inputs. `controlnet_path` is required for
+  `krea-2-depth` (validated early with a clear message) and also feeds a custom `flux-controlnet`.
+  `controlnet_strength` scales the Krea 2 depth-control deltas at load time.
+- **Mask-preserve composite** on the sampler for edit/img2img models that do not inpaint natively
+  (`flux2-edit`, `qwen-edit`, `krea2`, base img2img). Connect a mask on `mflux Image` and choose
+  `mask_mode`: `preserve` keeps the painted (white) region pixel-identical to the original (a
+  hard-lock for windows and doors during a restyle), while `inpaint` lets only the painted region
+  take the edit. `mask_feather` softens the seam. `flux-fill` still uses its mask natively, so the
+  composite does not apply there.
+- **Interior-design example workflows** (`example_workflows/`): `interior_krea2_depth.json`
+  (depth-locked renovation) and `interior_flux2_edit_mask_preserve.json` (edit with locked openings).
+
 ## [0.2.0]
 
 ### Added

@@ -173,6 +173,41 @@ def _image_to_temp_png(image_tensor):
     return path
 
 
+def _mask_to_gray01(mask_tensor, out_w, out_h, feather):
+    """A ComfyUI mask/image tensor -> float32 HxW in [0,1] at (out_h,out_w), edge-feathered.
+    Accepts an IMAGE (B,H,W,C) or MASK (B,H,W); collapses channels by mean."""
+    from PIL import Image, ImageFilter
+    a = mask_tensor
+    if hasattr(a, "cpu"):
+        a = a.cpu().numpy()
+    a = np.asarray(a, dtype=np.float32)
+    if a.ndim == 4:      # (B,H,W,C)
+        a = a[0]
+        a = a.mean(axis=2) if a.ndim == 3 else a
+    elif a.ndim == 3:    # (B,H,W) mask or (H,W,C) image
+        a = a[0] if a.shape[0] in (1, 2, 3, 4) and a.shape[-1] not in (1, 2, 3, 4) else a.mean(axis=2)
+    a = np.clip(a, 0.0, 1.0)
+    pil = Image.fromarray((a * 255.0).astype(np.uint8), mode="L").resize((out_w, out_h), Image.BILINEAR)
+    if feather and feather > 0:
+        pil = pil.filter(ImageFilter.GaussianBlur(radius=float(feather)))
+    return np.asarray(pil, dtype=np.float32) / 255.0
+
+
+def _preserve_composite(original_tensor, edited_pil, mask_tensor, keep_white, feather):
+    """Blend an edited image back over the original so painted regions stay pixel-identical.
+    keep_white=True: white mask = KEEP original (lock openings). False: white = allow the edit
+    (standard inpaint polarity). Returns a (1,H,W,3) IMAGE tensor at the edited image's size."""
+    edited = np.asarray(edited_pil.convert("RGB"), dtype=np.float32) / 255.0
+    h, w = edited.shape[:2]
+    from PIL import Image
+    orig_pil = Image.fromarray((original_tensor[0].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)).convert("RGB")
+    orig = np.asarray(orig_pil.resize((w, h), Image.BILINEAR), dtype=np.float32) / 255.0
+    m = _mask_to_gray01(mask_tensor, w, h, feather)[..., None]   # HxWx1, 1 = white
+    keep = m if keep_white else (1.0 - m)                        # weight on the ORIGINAL
+    out = orig * keep + edited * (1.0 - keep)
+    return torch.from_numpy(np.clip(out, 0.0, 1.0)).unsqueeze(0)
+
+
 def _clean_caption_prompt(prompt):
     """Pull a clean JSON caption out of an LLM's output. mflux's Ideogram parser
     only uses the structured caption when the prompt starts with '{' and parses to
@@ -266,6 +301,13 @@ def normalize_and_validate(profile, params_mode, requested, image_paths):
     if profile.needs_image and not has_image:
         roles = ", ".join(sorted(profile.required_image_args))
         raise ValueError(f"'{profile.family}' requires image input(s) [{roles}] — connect a MfluxImage.")
+    # Families whose image roles are all optional but that still need one source at run time
+    # (krea2-depth: DepthPro needs a photo unless a precomputed depth map is provided on map_image).
+    if profile.family in D.NEEDS_ANY_IMAGE and not has_image:
+        raise ValueError(
+            f"'{profile.family}' needs a room photo (connect 'image' on MfluxImage — DepthPro derives "
+            f"the depth) or a precomputed depth map (connect 'map_image')."
+        )
 
     # TIER 2 — the steps/guidance trap on preset-only models
     user_steps = requested.get("steps")
@@ -353,7 +395,7 @@ class MfluxImage:
             "required": {"image": ("IMAGE",)},
             "optional": {
                 "image_in": ("MFLUX_IMAGE", {"tooltip": "Chain another MfluxImage to add reference images (multi-image edit, e.g. qwen-edit / flux2-edit). The first image in the chain is the primary/viewpoint reference."}),
-                "mask": ("IMAGE", {"tooltip": "Inpaint mask for fill models (masked_image_path)."}),
+                "mask": ("IMAGE", {"tooltip": "Mask. On flux-fill it is the native inpaint mask. On edit/img2img models (FLUX.2-edit, qwen-edit, krea2) it drives the sampler's mask-preserve composite: white = lock to original (hard-lock windows/doors) or take-the-edit, per the sampler's mask_mode. IMAGE type — convert a MaskEditor/SAM MASK with a 'Convert Mask to Image' node."}),
                 "map_image": ("IMAGE", {"tooltip": "Depth map / control image for depth & controlnet models."}),
                 "strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
             },
@@ -391,6 +433,8 @@ class MfluxModelLoader:
                 "base_model": (["(none)"] + list(ui.MODEL_CHOICES), {"default": "(none)"}),
                 "model_path": ("STRING", {"default": "", "tooltip": "HF org/model or local path; overrides 'model' as the load target."}),
                 "lora": ("MFLUX_LORA",),
+                "controlnet_path": ("STRING", {"default": "", "tooltip": "Local path to a ControlNet checkpoint. REQUIRED for krea-2-depth (the depth-control checkpoint); optional for flux-controlnet (a custom controlnet)."}),
+                "controlnet_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Krea-2-depth only: scales the control deltas merged into the base weights at load time. (flux-controlnet reads its strength from the sampler instead.)"}),
                 "keep_loaded": ("BOOLEAN", {"default": True}),
                 "free_comfy_first": ("BOOLEAN", {"default": True}),
             },
@@ -402,15 +446,28 @@ class MfluxModelLoader:
     CATEGORY = "MLX/mflux/loaders"
 
     def load(self, model, quantize, base_model="(none)", model_path="",
-             lora=None, keep_loaded=True, free_comfy_first=True):
+             lora=None, controlnet_path="", controlnet_strength=1.0,
+             keep_loaded=True, free_comfy_first=True):
         model = strip_mark(model)          # drop the dropdown "needs download" mark
         base = "" if base_model in ("(none)", "") else base_model
         q = None if quantize == "none" else int(quantize)
         lp = [p for p, s in lora] if lora else None
         ls = [s for p, s in lora] if lora else None
+        cn_path = controlnet_path.strip() or None
 
         cls, family, cfg, path = D.resolve_config_and_path(model, base, model_path.strip())
-        cache_key = (family, path or model, q, tuple(lp or ()), tuple(ls or ()), base)
+
+        # Fail early with a clear message rather than an opaque TypeError from the constructor.
+        if D.requires_controlnet_path(cls) and not cn_path:
+            raise ValueError(
+                f"'{model}' is a ControlNet model and needs a checkpoint — set 'controlnet_path' "
+                f"on the loader to the local depth-control checkpoint."
+            )
+        if cn_path and not os.path.exists(cn_path):
+            raise ValueError(f"controlnet_path does not exist: {cn_path}")
+
+        cache_key = (family, path or model, q, tuple(lp or ()), tuple(ls or ()), base,
+                     cn_path or "", float(controlnet_strength))
 
         lora_note = ""
         if keep_loaded and _CACHE["key"] == cache_key:
@@ -422,6 +479,7 @@ class MfluxModelLoader:
                 instance = D.build_model(
                     cls, quantize=q, model_config=cfg, model_path=path,
                     lora_paths=lp, lora_scales=ls, bake_lora=True,
+                    controlnet_path=cn_path, controlnet_strength=float(controlnet_strength),
                 )
             except Exception as e:
                 blob = (type(e).__name__ + " " + str(e)).lower()
@@ -435,6 +493,7 @@ class MfluxModelLoader:
                     instance = D.build_model(
                         cls, quantize=q, model_config=cfg, model_path=path,
                         lora_paths=None, lora_scales=None, bake_lora=True,
+                        controlnet_path=cn_path, controlnet_strength=float(controlnet_strength),
                     )
                 elif any(t in blob for t in ("gated", "restricted", "403", "401")):
                     raise RuntimeError(
@@ -481,6 +540,8 @@ class MfluxModelSampler:
                 "image": ("IMAGE", {"tooltip": "Quick img2img on base models. For variants (fill/depth/controlnet) use MfluxImage."}),
                 "image_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "mflux_image": ("MFLUX_IMAGE",),
+                "mask_mode": (["preserve", "inpaint", "off"], {"default": "preserve", "tooltip": "How to use a mask connected on MfluxImage for edit/img2img models that don't inpaint natively (FLUX.2-edit, qwen-edit, krea2, img2img). preserve: painted (white) areas stay pixel-identical to the original — lock windows/doors. inpaint: only painted (white) areas take the edit. off: ignore. (flux-fill uses its mask natively; this does not apply.)"}),
+                "mask_feather": ("INT", {"default": 4, "min": 0, "max": 200, "tooltip": "Gaussian feather (px) on the mask edge for a seamless composite."}),
             },
         }
 
@@ -492,7 +553,8 @@ class MfluxModelSampler:
     def generate(self, model, prompt, params_mode, negative_prompt="", seed=0,
                  steps=0, guidance=0.0, width=1024, height=1024, scheduler="auto",
                  preset="(model default)", strict_caption_validation=False,
-                 image=None, image_strength=0.6, mflux_image=None):
+                 image=None, image_strength=0.6, mflux_image=None,
+                 mask_mode="preserve", mask_feather=4):
         handle = model
         prompt = _clean_caption_prompt(prompt)
         if handle.free_comfy_first:
@@ -540,11 +602,30 @@ class MfluxModelSampler:
         if getattr(handle, "lora_note", ""):
             notes = [handle.lora_note] + notes
         info = f"model={handle.alias} family={handle.family} forwarded={sorted(forwarded)}"
+
+        # Mask-preserve composite: for edit/img2img models that do NOT consume a mask natively,
+        # a connected mask lets painted regions stay locked to the original (hard-lock openings)
+        # or restrict the edit to the painted region. flux-fill consumes its mask natively -> skip.
+        out_image = _pil_to_image(gen.image)
+        native_mask = bool(set(handle.profile.image_role_args) & MASK_ARGS)
+        if (payload is not None and payload.mask is not None and not native_mask
+                and mask_mode != "off" and payload.images):
+            try:
+                out_image = _preserve_composite(
+                    original_tensor=payload.images[0], edited_pil=gen.image,
+                    mask_tensor=payload.mask, keep_white=(mask_mode == "preserve"),
+                    feather=int(mask_feather),
+                )
+                notes.append(f"[mflux] mask composite: mode={mask_mode}, feather={mask_feather}px "
+                             f"(painted={'kept from original' if mask_mode == 'preserve' else 'took the edit'}).")
+            except Exception as e:
+                notes.append(f"[mflux] mask composite skipped ({type(e).__name__}: {e}).")
+
         if notes:
             info += "\n" + "\n".join(notes)
             for n in notes:
                 print(n)
-        return (_pil_to_image(gen.image), info)
+        return (out_image, info)
 
 
 # --------------------------------------------------------------------------- #

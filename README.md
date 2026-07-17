@@ -52,7 +52,7 @@ Restart ComfyUI.
 | **mflux Model Loader** | Resolve a model (builtin alias, HuggingFace repo, or local path) with quantization and an optional LoRA chain. Outputs a typed `MFLUX_MODEL` handle that carries the model and its capability profile. |
 | **mflux Sampler** | Generate from the handle. Reads the capability profile and forwards only valid parameters. Outputs the image and an `info` string listing what was forwarded or dropped. |
 | **mflux LoRA** | Chainable LoRA feeder (local file, HuggingFace repo, or `repo:filename.safetensors`). Stack several to compose. |
-| **mflux Image** | Typed image feeder: a primary image plus an optional mask (for fill) and an optional depth/control map (for depth and controlnet models). |
+| **mflux Image** | Typed image feeder: a primary image, an optional mask (native inpaint for fill, or the mask-preserve composite for edit models), and an optional depth/control map (for depth and controlnet models). Chain via `image_in` for multi-image edits. |
 | **mflux Upscale (SeedVR2)** | One-step SeedVR2 upscaler. Loads its own model. |
 
 ## Supported models
@@ -67,12 +67,33 @@ Image-conditioned (loader + sampler + **mflux Image**):
 
 `dev-kontext` (instruction edit), `dev-fill` (inpaint, needs a mask),
 `dev-depth` (depth-guided, needs a depth map), `dev-redux` (image reference),
-`dev-controlnet-canny` (needs a control image), `qwen-image-edit`, `fibo-edit`.
+`dev-controlnet-canny` (needs a control image), `qwen-image-edit`, `fibo-edit`,
+`flux2-klein-edit`, `krea-2-depth` (depth ControlNet, needs a `controlnet_path`).
 
 A HuggingFace repo or local path can be typed into the loader's `model_path` to run
 a model that is not in the dropdown; it is dispatched to the right architecture by
 name, and rejected with a clear message if it is not a sampler model (for example a
 SeedVR2 upscaler).
+
+## Interior design / renovation
+
+The edit and depth-ControlNet models make this node a practical interior-renovation
+tool: restyle a real room photo (floors, walls, lighting, furniture) while keeping
+the room's geometry. Two paths, both in `example_workflows/`:
+
+- **Depth-locked restyle (`krea-2-depth`).** Load `krea-2-depth`, set `controlnet_path`
+  to the depth-control checkpoint, and feed the room photo on `mflux Image`. DepthPro
+  derives the depth automatically, so the render preserves the room's layout and volume
+  while the prompt drives the new look. Feed a precomputed depth on `map_image` to skip
+  the DepthPro step. See `interior_krea2_depth.json`.
+- **Instruction edit with locked openings (`flux2-klein-edit` / `qwen-image-edit`).**
+  Edit the whole room from a prompt, then paint a mask on `mflux Image` and set the
+  sampler's `mask_mode` to `preserve` to hold windows and doors pixel-identical to the
+  original (`inpaint` instead restricts the edit to the painted region). `mask_feather`
+  softens the seam. See `interior_flux2_edit_mask_preserve.json`.
+
+Anchor scale in the prompt with the room's real dimensions, and add an anti-hallucination
+clause ("do not add or remove windows or doors") for the edit path.
 
 ## How the capability system works
 
