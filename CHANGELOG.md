@@ -3,6 +3,24 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.2.0]
+
+### Added
+- New models, catching the dispatch up to mflux 0.18.23: **Krea 2** (Turbo and Raw),
+  **Boogu-Image-0.1-Turbo**, and **FLUX.2-klein edit** (`flux2-klein-edit`) — the fast,
+  structure-faithful edit model. All selectable from the dropdown.
+- **Multi-image edit**: `mflux Image` is now chainable via `image_in`, so you can stack
+  several reference images for the edit models that take an image list (`qwen-edit`,
+  `flux2-edit`). The first image in the chain is the primary/viewpoint reference.
+
+### Fixed
+- Full instruction-edit models (`flux2-edit`, `qwen-edit`) no longer have `image_strength`
+  forced on them. Their `image_strength` defaults to `None` (a full edit); forcing the
+  feeder's strength turned the edit into a degraded partial img2img that reinterpreted the
+  whole scene. Strength is now applied only to real img2img (`image_path`) and to redux.
+- `qwen-image-layered` (image-to-RGBA-layers, no standard sampler API) is excluded from the
+  sampler dropdown so selecting it can't crash the sampler.
+
 ## [0.1.1]
 
 ### Added

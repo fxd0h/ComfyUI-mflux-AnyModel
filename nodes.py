@@ -110,7 +110,7 @@ def model_choices():
     allowed = D.BASE_FAMILIES | D.WIRED_VARIANT_FAMILIES
     seen, have, need = set(), [], []
     for k in list(ui.MODEL_CHOICES) + list(D.ALIAS_DISPATCH) + list(D.DROPDOWN_EXTRA):
-        if k in seen or k in D.SEEDVR2_ALIASES:
+        if k in seen or k in D.SEEDVR2_ALIASES or k in D.NON_SAMPLER_ALIASES:
             continue
         seen.add(k)
         try:
@@ -140,7 +140,7 @@ class MfluxModelHandle:
 
 @dataclass
 class MfluxImagePayload:
-    primary: object               # IMAGE tensor (required)
+    images: list                  # ordered IMAGE tensors; [0] is the primary/viewpoint ref (>=1)
     mask: object = None           # IMAGE tensor (inpaint / fill)
     aux: object = None            # IMAGE tensor (depth map / control image)
     strength: float = None
@@ -218,7 +218,7 @@ def inject_image(profile, out, paths, gen):
         if arg in PRIMARY_SCALAR:
             out[arg] = paths["primary"]
         elif arg in PRIMARY_LIST:
-            out[arg] = [paths["primary"]]
+            out[arg] = list(paths.get("primaries") or [paths["primary"]])
         elif arg in MASK_ARGS:
             if paths.get("mask") is None:
                 raise ValueError(f"'{profile.family}' needs a mask — connect 'mask' on MfluxImage.")
@@ -230,9 +230,16 @@ def inject_image(profile, out, paths, gen):
                 raise ValueError(f"'{profile.family}' needs a depth/control map — connect 'map_image' on MfluxImage.")
     strength = paths.get("strength")
     if strength is not None:
+        roles = profile.image_role_args
         for arg in gen & STRENGTH_SCALAR:
+            # `image_strength` must NOT be forced on full instruction-edit models (image_paths role):
+            # it defaults to None there (a full edit), and forcing a value turns the edit into a degraded
+            # partial img2img (observed: flux2-edit/qwen-edit reinterpret the scene entirely). Apply it
+            # only for real img2img (scalar image_path). controlnet_strength is unaffected.
+            if arg == "image_strength" and "image_path" not in roles:
+                continue
             out[arg] = float(strength)
-        for arg in gen & STRENGTH_LIST:
+        for arg in gen & STRENGTH_LIST:       # redux_image_strengths — the intended redux control
             out[arg] = [float(strength)]
 
 
@@ -345,6 +352,7 @@ class MfluxImage:
         return {
             "required": {"image": ("IMAGE",)},
             "optional": {
+                "image_in": ("MFLUX_IMAGE", {"tooltip": "Chain another MfluxImage to add reference images (multi-image edit, e.g. qwen-edit / flux2-edit). The first image in the chain is the primary/viewpoint reference."}),
                 "mask": ("IMAGE", {"tooltip": "Inpaint mask for fill models (masked_image_path)."}),
                 "map_image": ("IMAGE", {"tooltip": "Depth map / control image for depth & controlnet models."}),
                 "strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
@@ -356,8 +364,16 @@ class MfluxImage:
     FUNCTION = "build"
     CATEGORY = "MLX/mflux/inputs"
 
-    def build(self, image, mask=None, map_image=None, strength=0.6):
-        return (MfluxImagePayload(primary=image, mask=mask, aux=map_image, strength=float(strength)),)
+    def build(self, image, image_in=None, mask=None, map_image=None, strength=0.6):
+        if image_in is not None:
+            # Append to the chain; keep the upstream mask/aux/strength unless this node overrides them.
+            return (MfluxImagePayload(
+                images=list(image_in.images) + [image],
+                mask=mask if mask is not None else image_in.mask,
+                aux=map_image if map_image is not None else image_in.aux,
+                strength=float(strength) if strength is not None else image_in.strength,
+            ),)
+        return (MfluxImagePayload(images=[image], mask=mask, aux=map_image, strength=float(strength)),)
 
 
 # --------------------------------------------------------------------------- #
@@ -485,7 +501,7 @@ class MfluxModelSampler:
         # resolve the image payload (typed MfluxImage wins over the simple image)
         payload = mflux_image
         if payload is None and image is not None:
-            payload = MfluxImagePayload(primary=image, strength=image_strength)
+            payload = MfluxImagePayload(images=[image], strength=image_strength)
 
         temps = []
 
@@ -497,8 +513,10 @@ class MfluxModelSampler:
         try:
             image_paths = None
             if payload is not None:
+                prim_paths = [materialize(t) for t in payload.images]
                 image_paths = {
-                    "primary": materialize(payload.primary),
+                    "primary": prim_paths[0],           # scalar image roles use the first (viewpoint) ref
+                    "primaries": prim_paths,            # list image roles (edit) get every reference
                     "mask": materialize(payload.mask) if payload.mask is not None else None,
                     "aux": materialize(payload.aux) if payload.aux is not None else None,
                     "strength": payload.strength if payload.strength is not None else image_strength,

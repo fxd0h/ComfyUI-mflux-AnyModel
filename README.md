@@ -2,8 +2,10 @@
 
 Run any [mflux](https://github.com/filipstrand/mflux) model inside ComfyUI on Apple
 Silicon (MLX/Metal). A single loader and sampler pair drives every mflux model
-family — FLUX.1, FLUX.2 Klein, Qwen-Image, Z-Image, Ideogram 4, FIBO, ERNIE-Image —
-plus their image-conditioned variants, through one consistent interface.
+family — FLUX.1, FLUX.2 Klein (incl. **edit**), Qwen-Image (incl. edit), Krea 2,
+Boogu, Z-Image, Ideogram 4, FIBO, ERNIE-Image — plus their image-conditioned
+variants, through one consistent interface. Edit models that take several reference
+images (`qwen-edit`, `flux2-edit`) are driven by chaining the `mflux Image` feeder.
 
 The node is built around a **capability registry**: for the selected model it
 inspects the real `generate_image` signature and forwards only the parameters that

@@ -36,6 +36,9 @@ from mflux.models.ideogram4.weights.ideogram4_weight_definition import Ideogram4
 from mflux.models.fibo.variants.txt2img.fibo import FIBO
 from mflux.models.fibo.variants.edit.fibo_edit import FIBOEdit
 from mflux.models.ernie_image.variants.txt2img.ernie_image import ErnieImage
+from mflux.models.krea2.variants.txt2img.krea2 import Krea2
+from mflux.models.krea2.variants.controlnet.krea2_depth import Krea2Depth
+from mflux.models.boogu.variants.txt2img.boogu_image import BooguImage
 
 # Variant aliases that must dispatch to a dedicated class (a plain base-family
 # ladder would route all of these to Flux1 and silently ignore their image inputs).
@@ -56,23 +59,26 @@ ALIAS_DISPATCH = {
 # Aliases handled by dedicated nodes, not the txt2img/edit sampler.
 SEEDVR2_ALIASES = {"seedvr2", "seedvr2-3b", "seedvr2-7b", "seedvr2-7B"}
 
-# Base txt2img families the Phase-2 sampler can drive end-to-end. Variant/edit
-# families (flux-kontext/fill/depth/redux/controlnet/catvton, *-edit) are excluded
-# from the dropdown until the typed MfluxImage feeder ships (Phase 3); they would
-# either crash (required image role) or run semantically degraded (e.g. depth as
-# plain img2img). Their classes still resolve, so a *typed* alias hard-blocks with
-# a clear message via the sampler's required-arg guard.
-BASE_FAMILIES = {"flux", "qwen", "z-image", "ideogram4", "fibo", "ernie", "flux2"}
+# Aliases that resolve but have no standard generate_image sampler API (special output
+# or a different entrypoint) — excluded from the sampler dropdown so they never crash it.
+# Qwen-Image-Layered decomposes an image into RGBA layers (i2l), not a txt2img/edit sampler.
+NON_SAMPLER_ALIASES = {"qwen-image-layered", "qwen-layered"}
 
-# Variant/edit families the Phase-3 sampler can drive via the typed MfluxImage
-# feeder (primary + optional mask + optional depth/control map). catvton and the
-# in-context diptych variants are intentionally left out (multi-image roles).
+# Base txt2img families the sampler drives end-to-end (seed/prompt, optional img2img).
+BASE_FAMILIES = {"flux", "qwen", "z-image", "ideogram4", "fibo", "ernie", "flux2", "krea2", "boogu"}
+
+# Variant/edit families the sampler drives via the typed MfluxImage feeder (primary +
+# optional mask + optional depth/control map + multi-image). catvton and the in-context
+# diptych variants are left out (multi-image diptych roles the feeder does not model).
+# NOTE: krea2-depth (Krea2Depth) resolves but needs a required controlnet_path (the depth-control
+# checkpoint) that the loader does not yet expose as an input — TODO: add a controlnet_path UI. Until
+# then it is not offered (no dropdown alias routes to it) and stays out of the wired set.
 WIRED_VARIANT_FAMILIES = {
     "flux-kontext", "flux-fill", "flux-depth", "flux-redux", "flux-controlnet",
-    "qwen-edit", "fibo-edit",
+    "qwen-edit", "fibo-edit", "flux2-edit",
 }
-# Edit aliases that are valid models but not present in ui.MODEL_CHOICES.
-DROPDOWN_EXTRA = ["qwen-image-edit"]
+# Edit/variant aliases that are valid models but not present in ui.MODEL_CHOICES.
+DROPDOWN_EXTRA = ["qwen-image-edit", "flux2-klein-edit", "krea-2", "krea-2-raw"]
 
 
 def pick_base_class(model: str, base_model: str = ""):
@@ -80,6 +86,11 @@ def pick_base_class(model: str, base_model: str = ""):
     m, b = model.lower(), (base_model or "").lower()
     if "ernie" in m:
         return ErnieImage, "ernie"
+    # Krea 2 (krea-2 / krea2), NOT Flux.1 Krea ("krea-dev" / "dev-krea", handled by the Flux1 fallback).
+    if ("krea-2" in m or "krea2" in m) and "dev" not in m:
+        return Krea2, "krea2"
+    if "boogu" in m:
+        return BooguImage, "boogu"
     if "qwen" in m and "edit" in m:
         return QwenImageEdit, "qwen-edit"
     if "qwen" in m:
