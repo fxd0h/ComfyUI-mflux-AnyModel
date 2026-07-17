@@ -53,6 +53,7 @@ Restart ComfyUI.
 | **mflux Sampler** | Generate from the handle. Reads the capability profile and forwards only valid parameters. Outputs the image and an `info` string listing what was forwarded or dropped. |
 | **mflux LoRA** | Chainable LoRA feeder (local file, HuggingFace repo, or `repo:filename.safetensors`). Stack several to compose. |
 | **mflux Image** | Typed image feeder: a primary image, an optional mask (native inpaint for fill, or the mask-preserve composite for edit models), and an optional depth/control map (for depth and controlnet models). Chain via `image_in` for multi-image edits. |
+| **mflux Auto Mask** | Segments a room photo (ADE20K SegFormer) and turns a named region (floor / walls / ceiling / windows / doors / furniture / custom) into a mask, for regional restyling without hand-painting. Runs locally on MPS. |
 | **mflux Upscale (SeedVR2)** | One-step SeedVR2 upscaler. Loads its own model. |
 
 ## Supported models
@@ -101,6 +102,13 @@ reference; each node's `strength` weights that reference in the blend, so you ca
 this palette, 30% that". Redux generates a new image in the referenced style rather than
 restyling one specific room, so use it for direction and inspiration, and the depth path
 above when you need to keep an exact room's geometry. See `interior_redux_moodboard.json`.
+
+**Regional restyle (restyle only the floor, keep the windows).** `mflux Auto Mask` segments
+the room with an ADE20K model and turns a named region into a mask, so you can restyle one
+surface without hand-painting. Wire it into `mflux Image` -> mask, then on the sampler pick
+`inpaint` to change only that region ("restyle only the floor") or `preserve` to lock it
+("keep the windows"). Segmentation runs locally on Apple Silicon (MPS). See
+`interior_regional_restyle.json`.
 
 ## How the capability system works
 

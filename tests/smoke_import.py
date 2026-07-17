@@ -14,6 +14,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import mflux_dispatch as D  # must not raise even when fork models are absent
 import capability as C      # noqa: F401
 import nodes                # noqa: F401  — the ComfyUI entry surface
+import segmentation as Seg  # noqa: F401  — the AutoMask node (torch/transformers, no fork dep)
+
+assert Seg.MfluxAutoMask.RETURN_TYPES[0] == "MASK", "AutoMask must expose a MASK output"
 
 # base families that exist in ANY mflux must still resolve to a real class
 cls, fam = D.pick_model_class("schnell")

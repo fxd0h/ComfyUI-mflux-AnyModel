@@ -1,0 +1,53 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "room.png"
+    }
+  },
+  "2": {
+    "class_type": "MfluxAutoMask",
+    "inputs": {
+      "image": ["1", 0],
+      "region": "floor",
+      "dilate": 6,
+      "feather": 6
+    }
+  },
+  "3": {
+    "class_type": "MfluxModelLoader",
+    "inputs": {
+      "model": "flux2-klein-edit",
+      "quantize": "8",
+      "keep_loaded": true,
+      "free_comfy_first": true
+    }
+  },
+  "4": {
+    "class_type": "MfluxImage",
+    "inputs": {
+      "image": ["1", 0],
+      "mask": ["2", 1]
+    }
+  },
+  "5": {
+    "class_type": "MfluxModelSampler",
+    "inputs": {
+      "model": ["3", 0],
+      "mflux_image": ["4", 0],
+      "prompt": "replace the floor with dark walnut herringbone parquet, keep everything else",
+      "params_mode": "auto",
+      "seed": 3,
+      "width": 1024,
+      "height": 1024,
+      "mask_mode": "inpaint",
+      "mask_feather": 6
+    }
+  },
+  "6": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": ["5", 0]
+    }
+  }
+}

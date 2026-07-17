@@ -22,6 +22,8 @@ jobs:
         run: python tests/test_dispatch.py
       - name: Sampler self-tests
         run: python tests/test_sampler.py
+      - name: Segmentation (AutoMask) self-tests
+        run: python tests/test_segmentation.py
       - name: Upstream-compatibility smoke test
         run: python tests/smoke_import.py
 

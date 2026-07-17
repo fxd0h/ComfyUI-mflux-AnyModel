@@ -5,6 +5,7 @@ from .nodes import (
     MfluxImage,
     MfluxUpscale,
 )
+from .segmentation import MfluxAutoMask
 
 NODE_CLASS_MAPPINGS = {
     "MfluxModelLoader": MfluxModelLoader,
@@ -12,6 +13,7 @@ NODE_CLASS_MAPPINGS = {
     "MfluxLora": MfluxLora,
     "MfluxImage": MfluxImage,
     "MfluxUpscale": MfluxUpscale,
+    "MfluxAutoMask": MfluxAutoMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -20,6 +22,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MfluxLora": "mflux LoRA",
     "MfluxImage": "mflux Image",
     "MfluxUpscale": "mflux Upscale (SeedVR2)",
+    "MfluxAutoMask": "mflux Auto Mask (interior segmentation)",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

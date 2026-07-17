@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.5.0]
+
+### Added
+- **`mflux Auto Mask` node — regional interior editing without hand-painting.** Segments a room
+  photo with an ADE20K semantic model (SegFormer, local on Apple Silicon MPS) and turns a named
+  region (floor, walls, ceiling, windows, doors, openings, surfaces, furniture, or custom ADE20K
+  labels) into a mask. Feed it to `mflux Image` -> mask and pick the sampler's `mask_mode`:
+  `inpaint` restyles only that region ("restyle only the floor"), `preserve` locks it ("keep the
+  windows"). Options for invert, dilate, feather, and the SegFormer size (b0/b2/b4/b5). This is the
+  regional-control capability of a serious interior workflow, reached without a segmentation
+  ControlNet (none exists for FLUX/Krea) by using segmentation as a mask preprocessor for the
+  existing mask-preserve composite. Validated end to end: floor swapped to dark parquet, the rest
+  of the room pixel-identical. See `interior_regional_restyle.json`.
+
 ## [0.4.2]
 
 ### Fixed
