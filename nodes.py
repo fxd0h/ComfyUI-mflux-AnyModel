@@ -143,7 +143,8 @@ class MfluxImagePayload:
     images: list                  # ordered IMAGE tensors; [0] is the primary/viewpoint ref (>=1)
     mask: object = None           # IMAGE tensor (inpaint / fill)
     aux: object = None            # IMAGE tensor (depth map / control image)
-    strength: float = None
+    strength: float = None        # scalar roles (img2img / controlnet) — the primary's strength
+    strengths: list = None        # per-image, aligned with images (redux multi-reference blend)
 
 
 _CACHE = {"key": None, "model": None}          # one big sampler model resident
@@ -274,8 +275,9 @@ def inject_image(profile, out, paths, gen):
             if arg == "image_strength" and "image_path" not in roles:
                 continue
             out[arg] = float(strength)
-        for arg in gen & STRENGTH_LIST:       # redux_image_strengths — the intended redux control
-            out[arg] = [float(strength)]
+        for arg in gen & STRENGTH_LIST:       # redux_image_strengths — one per reference image
+            per_image = paths.get("strengths")
+            out[arg] = [float(s) for s in per_image] if per_image else [float(strength)]
 
 
 def normalize_and_validate(profile, params_mode, requested, image_paths):
@@ -407,15 +409,20 @@ class MfluxImage:
     CATEGORY = "MLX/mflux/inputs"
 
     def build(self, image, image_in=None, mask=None, map_image=None, strength=0.6):
+        s = float(strength) if strength is not None else 1.0
         if image_in is not None:
-            # Append to the chain; keep the upstream mask/aux/strength unless this node overrides them.
+            # Append to the chain; keep the upstream mask/aux unless this node overrides them.
+            # strengths grows with the chain (one per image); scalar strength stays the primary's,
+            # so redux gets a per-reference blend while img2img/controlnet keep a single value.
+            prev = list(image_in.strengths) if image_in.strengths else [image_in.strength if image_in.strength is not None else 1.0]
             return (MfluxImagePayload(
                 images=list(image_in.images) + [image],
                 mask=mask if mask is not None else image_in.mask,
                 aux=map_image if map_image is not None else image_in.aux,
-                strength=float(strength) if strength is not None else image_in.strength,
+                strength=image_in.strength if image_in.strength is not None else s,
+                strengths=prev + [s],
             ),)
-        return (MfluxImagePayload(images=[image], mask=mask, aux=map_image, strength=float(strength)),)
+        return (MfluxImagePayload(images=[image], mask=mask, aux=map_image, strength=s, strengths=[s]),)
 
 
 # --------------------------------------------------------------------------- #
@@ -576,12 +583,17 @@ class MfluxModelSampler:
             image_paths = None
             if payload is not None:
                 prim_paths = [materialize(t) for t in payload.images]
+                # per-image strengths aligned with the references (redux blend); fall back to the
+                # scalar for every image if the payload predates per-image strengths.
+                scalar_s = payload.strength if payload.strength is not None else image_strength
+                per_image = payload.strengths if payload.strengths else [scalar_s] * len(prim_paths)
                 image_paths = {
                     "primary": prim_paths[0],           # scalar image roles use the first (viewpoint) ref
                     "primaries": prim_paths,            # list image roles (edit) get every reference
                     "mask": materialize(payload.mask) if payload.mask is not None else None,
                     "aux": materialize(payload.aux) if payload.aux is not None else None,
-                    "strength": payload.strength if payload.strength is not None else image_strength,
+                    "strength": scalar_s,
+                    "strengths": [float(s) for s in per_image],
                 }
             requested = {
                 "seed": int(seed), "prompt": prompt, "negative_prompt": negative_prompt,

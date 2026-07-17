@@ -95,6 +95,13 @@ the room's geometry. Two paths, both in `example_workflows/`:
 Anchor scale in the prompt with the room's real dimensions, and add an anti-hallucination
 clause ("do not add or remove windows or doors") for the edit path.
 
+**Style reference (Mood Board).** `dev-redux` blends the look of one or more reference
+photos (a Pinterest shot, a magazine spread) with your prompt. Chain an `mflux Image` per
+reference; each node's `strength` weights that reference in the blend, so you can dial "70%
+this palette, 30% that". Redux generates a new image in the referenced style rather than
+restyling one specific room, so use it for direction and inspiration, and the depth path
+above when you need to keep an exact room's geometry. See `interior_redux_moodboard.json`.
+
 ## How the capability system works
 
 On load, the node resolves the alias to the correct mflux variant class (so a fill

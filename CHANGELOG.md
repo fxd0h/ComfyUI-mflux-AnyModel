@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.4.0]
+
+### Added
+- **Redux style reference (Mood Board)** via `dev-redux`, with **per-reference blend strength**.
+  Chain an `mflux Image` per reference photo and each node's `strength` now weights that reference
+  independently (`redux_image_strengths` receives the full aligned list instead of a single value),
+  so a multi-image blend actually honors "70% this palette, 30% that". `interior_redux_moodboard.json`
+  shows a two-reference blend. Redux generates a new image in the referenced style rather than
+  restyling one specific room, so it is for direction; use `krea-2-depth` to keep an exact geometry.
+
+### Fixed
+- Redux multi-reference blends previously applied the feeder's strength only to the first reference
+  (the injected `redux_image_strengths` was a one-element list regardless of image count). Each
+  reference now carries its own strength through the `mflux Image` chain.
+
 ## [0.3.0]
 
 ### Added

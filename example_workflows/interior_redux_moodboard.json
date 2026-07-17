@@ -1,0 +1,57 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "style_reference_a.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "style_reference_b.png"
+    }
+  },
+  "3": {
+    "class_type": "MfluxModelLoader",
+    "inputs": {
+      "model": "dev-redux",
+      "quantize": "8",
+      "keep_loaded": true,
+      "free_comfy_first": true
+    }
+  },
+  "4": {
+    "class_type": "MfluxImage",
+    "inputs": {
+      "image": ["1", 0],
+      "strength": 1.0
+    }
+  },
+  "5": {
+    "class_type": "MfluxImage",
+    "inputs": {
+      "image": ["2", 0],
+      "image_in": ["4", 0],
+      "strength": 0.6
+    }
+  },
+  "6": {
+    "class_type": "MfluxModelSampler",
+    "inputs": {
+      "model": ["3", 0],
+      "mflux_image": ["5", 0],
+      "prompt": "a warm modern living room interior in the referenced style, oak floor, framed art, soft daylight",
+      "params_mode": "auto",
+      "seed": 42,
+      "guidance": 2.5,
+      "width": 1024,
+      "height": 1024
+    }
+  },
+  "7": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": ["6", 0]
+    }
+  }
+}

@@ -194,4 +194,23 @@ g = _mask_to_gray01(torch.ones(1, 4, 4), 8, 8, 0)
 ok(g.shape == (8, 8) and g.mean() > 0.9, "mask (B,H,W) resizes to target and stays white")
 print("11. mask-preserve composite (preserve/inpaint polarity, resize, MASK shape) OK")
 
+# --- 12. redux multi-reference per-image strength (Mood Board) ---
+from nodes import MfluxImage
+# chain three references with distinct strengths
+(p1,) = MfluxImage().build(image=torch.zeros(1, 4, 4, 3), strength=1.0)
+(p2,) = MfluxImage().build(image=torch.zeros(1, 4, 4, 3), image_in=p1, strength=0.7)
+(p3,) = MfluxImage().build(image=torch.zeros(1, 4, 4, 3), image_in=p2, strength=0.3)
+ok(len(p3.images) == 3, "chain accumulates all three reference images")
+ok(p3.strengths == [1.0, 0.7, 0.3], f"per-image strengths align with the chain, got {p3.strengths}")
+ok(abs(p3.strength - 1.0) < 1e-6, "scalar strength stays the primary's (first) value for img2img/controlnet")
+# redux injection: redux_image_strengths must be the full aligned list, not a 1-element list
+predux = prof("dev-redux")
+paths = {"primary": "/tmp/a.png", "primaries": ["/tmp/a.png", "/tmp/b.png", "/tmp/c.png"],
+         "mask": None, "aux": None, "strength": 1.0, "strengths": [1.0, 0.7, 0.3]}
+fwd, _ = normalize_and_validate(predux, "auto", req(), paths)
+ok(fwd.get("redux_image_paths") == ["/tmp/a.png", "/tmp/b.png", "/tmp/c.png"], "redux gets all reference paths")
+ok(fwd.get("redux_image_strengths") == [1.0, 0.7, 0.3], f"redux_image_strengths is the full per-image list, got {fwd.get('redux_image_strengths')}")
+ok("image_strength" not in fwd, "redux: bare image_strength (init blend) must NOT be forced")
+print("12. redux multi-reference per-image strength OK")
+
 print(f"\nALL SELF-TESTS PASSED ({_checks} checks)")
