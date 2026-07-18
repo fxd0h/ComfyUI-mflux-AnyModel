@@ -1,0 +1,259 @@
+{
+ "last_node_id": 5,
+ "last_link_id": 3,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "MarkdownNote",
+   "pos": [
+    20.0,
+    20.0
+   ],
+   "size": [
+    1040.0,
+    170.0
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "02 · img2img",
+   "properties": {},
+   "widgets_values": [
+    "# 02 · Image to image\n\nFeed a starting image straight into the Sampler's `image` input and set `image_strength`\n(lower = closer to your image, higher = more freedom). Works on the base models."
+   ],
+   "color": "#2a363b",
+   "bgcolor": "#1e2a30"
+  },
+  {
+   "id": 2,
+   "type": "LoadImage",
+   "pos": [
+    20.0,
+    300.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      1
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "room.png"
+   ],
+   "title": "Start image",
+   "color": "#3f789e",
+   "bgcolor": "#233"
+  },
+  {
+   "id": 3,
+   "type": "MfluxModelLoader",
+   "pos": [
+    380.0,
+    300.0
+   ],
+   "size": [
+    340,
+    240
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "lora",
+     "type": "MFLUX_LORA",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "links": [
+      2
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelLoader"
+   },
+   "widgets_values": [
+    "schnell",
+    "8",
+    "(none)",
+    "",
+    "",
+    1.0,
+    true,
+    true
+   ],
+   "title": "Loader",
+   "color": "#3f789e",
+   "bgcolor": "#233"
+  },
+  {
+   "id": 4,
+   "type": "MfluxModelSampler",
+   "pos": [
+    740.0,
+    300.0
+   ],
+   "size": [
+    340,
+    440
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "link": 2
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 1
+    },
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      3
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelSampler"
+   },
+   "widgets_values": [
+    "the same room, warm evening light, cinematic",
+    "auto",
+    "",
+    1,
+    "randomize",
+    0,
+    0.0,
+    1024,
+    768,
+    "auto",
+    "(model default)",
+    false,
+    0.55,
+    "preserve",
+    4,
+    true,
+    2
+   ],
+   "title": "Sampler (image + strength)",
+   "color": "#37734a",
+   "bgcolor": "#232"
+  },
+  {
+   "id": 5,
+   "type": "PreviewImage",
+   "pos": [
+    1100.0,
+    300.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "Result",
+   "color": "#555",
+   "bgcolor": "#222"
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   0,
+   4,
+   1,
+   "IMAGE"
+  ],
+  [
+   2,
+   3,
+   0,
+   4,
+   0,
+   "MFLUX_MODEL"
+  ],
+  [
+   3,
+   4,
+   0,
+   5,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {},
+ "version": 0.4
+}

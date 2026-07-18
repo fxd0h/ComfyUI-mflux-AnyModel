@@ -1,0 +1,178 @@
+{
+ "last_node_id": 4,
+ "last_link_id": 2,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "MarkdownNote",
+   "pos": [
+    20.0,
+    20.0
+   ],
+   "size": [
+    1120.0,
+    210.0
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "10 · VLM",
+   "properties": {},
+   "widgets_values": [
+    "# 10 · VLM prompt writer (FIBO-vlm, MLX)\n\nTurn a photo and/or a brief into a prompt, natively on MLX (no cloud). Modes:\n**expand** (brief → prompt, ~15s), **analyze** (describe a photo, ~40s), **renovate** (apply a brief\nto a photo, ~11 min). Read the result in the display node, or wire `prompt` into any Sampler."
+   ],
+   "color": "#2a363b",
+   "bgcolor": "#1e2a30"
+  },
+  {
+   "id": 2,
+   "type": "LoadImage",
+   "pos": [
+    20.0,
+    300.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      1
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "room.png"
+   ],
+   "title": "Photo (for analyze/renovate)",
+   "color": "#3f789e",
+   "bgcolor": "#233"
+  },
+  {
+   "id": 3,
+   "type": "MfluxVLM",
+   "pos": [
+    380.0,
+    300.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "prompt",
+     "type": "STRING",
+     "links": [
+      2
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "survey",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxVLM"
+   },
+   "widgets_values": [
+    "expand (armá la escena desde MI brief, sin foto)",
+    "warm modern living room, three-seat sofa, coffee table, dark walnut floor, framed art, plants",
+    "briaai/FIBO-vlm",
+    "8",
+    0.2,
+    4096,
+    0,
+    "randomize",
+    true
+   ],
+   "title": "VLM · brief → prompt",
+   "color": "#9e6b3f",
+   "bgcolor": "#332"
+  },
+  {
+   "id": 4,
+   "type": "Display Any (rgthree)",
+   "pos": [
+    740.0,
+    300.0
+   ],
+   "size": [
+    340,
+    220
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 2
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "Display Any (rgthree)"
+   },
+   "widgets_values": [],
+   "title": "Prompt out",
+   "color": "#9e6b3f",
+   "bgcolor": "#332"
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   0,
+   3,
+   0,
+   "IMAGE"
+  ],
+  [
+   2,
+   3,
+   0,
+   4,
+   0,
+   "STRING"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {},
+ "version": 0.4
+}

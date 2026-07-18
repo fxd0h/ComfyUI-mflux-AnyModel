@@ -1,0 +1,374 @@
+{
+ "last_node_id": 7,
+ "last_link_id": 5,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "MarkdownNote",
+   "pos": [
+    20.0,
+    20.0
+   ],
+   "size": [
+    1120.0,
+    210.0
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "07 · Depth ControlNet",
+   "properties": {},
+   "widgets_values": [
+    "# 07 · Depth ControlNet (self-contained)\n\nLock the 3D perspective of a photo. **Depth map** is generated inside the workflow (DepthPro), so\nnothing is prepared outside. Set the Sampler `width/height` to your photo's aspect and `steps` to ~24.\nGood for a strict viewpoint; note it does not keep/add furniture (use example 04 for that)."
+   ],
+   "color": "#2a363b",
+   "bgcolor": "#1e2a30"
+  },
+  {
+   "id": 2,
+   "type": "LoadImage",
+   "pos": [
+    20.0,
+    300.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      1
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "room.png"
+   ],
+   "title": "Your room",
+   "color": "#3f789e",
+   "bgcolor": "#233"
+  },
+  {
+   "id": 3,
+   "type": "MfluxDepthMap",
+   "pos": [
+    380.0,
+    300.0
+   ],
+   "size": [
+    340,
+    130
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "depth_map",
+     "type": "IMAGE",
+     "links": [
+      2
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxDepthMap"
+   },
+   "widgets_values": [
+    "none",
+    true,
+    false
+   ],
+   "title": "Depth map (DepthPro)",
+   "color": "#37734a",
+   "bgcolor": "#232"
+  },
+  {
+   "id": 4,
+   "type": "MfluxModelLoader",
+   "pos": [
+    740.0,
+    300.0
+   ],
+   "size": [
+    340,
+    260
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "lora",
+     "type": "MFLUX_LORA",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "links": [
+      3
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelLoader"
+   },
+   "widgets_values": [
+    "dev-controlnet-canny",
+    "8",
+    "(none)",
+    "",
+    "Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0",
+    1.0,
+    true,
+    true
+   ],
+   "title": "Loader · FLUX.1 + depth CN",
+   "color": "#9e3f3f",
+   "bgcolor": "#322"
+  },
+  {
+   "id": 5,
+   "type": "MfluxImage",
+   "pos": [
+    1100.0,
+    300.0
+   ],
+   "size": [
+    340,
+    120
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 2
+    },
+    {
+     "name": "image_in",
+     "type": "MFLUX_IMAGE",
+     "link": null
+    },
+    {
+     "name": "mask",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "map_image",
+     "type": "IMAGE",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "links": [
+      4
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxImage"
+   },
+   "widgets_values": [
+    0.7
+   ],
+   "title": "ControlNet ← depth",
+   "color": "#9e3f3f",
+   "bgcolor": "#322"
+  },
+  {
+   "id": 6,
+   "type": "MfluxModelSampler",
+   "pos": [
+    1460.0,
+    300.0
+   ],
+   "size": [
+    340,
+    440
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "link": 3
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "link": 4
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      5
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelSampler"
+   },
+   "widgets_values": [
+    "a warm modern living room, dark walnut floor, cream walls, soft daylight",
+    "override",
+    "",
+    11,
+    "randomize",
+    24,
+    3.5,
+    1024,
+    768,
+    "auto",
+    "(model default)",
+    false,
+    0.6,
+    "preserve",
+    4,
+    true,
+    2
+   ],
+   "title": "Sampler · steps 24",
+   "color": "#9e3f3f",
+   "bgcolor": "#322"
+  },
+  {
+   "id": 7,
+   "type": "PreviewImage",
+   "pos": [
+    1820.0,
+    300.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 5
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "Result",
+   "color": "#555",
+   "bgcolor": "#222"
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   0,
+   3,
+   0,
+   "IMAGE"
+  ],
+  [
+   2,
+   3,
+   0,
+   5,
+   0,
+   "IMAGE"
+  ],
+  [
+   3,
+   4,
+   0,
+   6,
+   0,
+   "MFLUX_MODEL"
+  ],
+  [
+   4,
+   5,
+   0,
+   6,
+   2,
+   "MFLUX_IMAGE"
+  ],
+  [
+   5,
+   6,
+   0,
+   7,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {},
+ "version": 0.4
+}

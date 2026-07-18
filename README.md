@@ -76,6 +76,33 @@ a model that is not in the dropdown; it is dispatched to the right architecture 
 name, and rejected with a clear message if it is not a sampler model (for example a
 SeedVR2 upscaler).
 
+## Example workflows
+
+`example_workflows/` ships a set of small, openable workflows (drag one onto the
+ComfyUI canvas, or Workflow -> Open), one per capability, each with an in-canvas note
+that explains it. They default to fast, cached models where possible.
+
+| File | Shows |
+|---|---|
+| `01_txt2img.json` | Text to image with any model in the dropdown |
+| `02_img2img.json` | Image to image (`image` + `image_strength`) |
+| `03_lora.json` | Stack a LoRA (chainable) |
+| `04_edit_restyle.json` | Restyle a room and add furniture (edit model) |
+| `05_edit_replace_object.json` | Replace a specific object ("TV -> fireplace") |
+| `06_edit_region_mask.json` | Change only one region (auto-mask + inpaint) |
+| `07_controlnet_depth.json` | Depth ControlNet, depth map generated in-graph |
+| `08_multi_controlnet.json` | Stack depth + canny ControlNets |
+| `09_redux_moodboard.json` | Redux style transfer from reference photos |
+| `10_vlm_prompt.json` | FIBO-vlm writes a prompt from a brief/photo |
+| `11_upscale.json` | SeedVR2 upscale |
+| `INTERIOR_DESIGN_PRO.json` | Everything above wired into one interior tool |
+
+`INTERIOR_DESIGN_PRO.json` is the full board: three restyle paths (edit model, depth
+ControlNet, Redux), automatic depth and region analysis, an optional VLM prompt writer,
+live previews, and a before/after comparison. Turn one path on at a time with the
+Bypasser; start with **path B** (the edit model), which keeps your room and adds or
+replaces furniture. The generators that build these live in `tools/`.
+
 ## Interior design / renovation
 
 The edit and depth-ControlNet models make this node a practical interior-renovation

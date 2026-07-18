@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.7.0]
+
+### Added
+- **`mflux VLM` node — write the prompt from a room photo, natively on MLX.** Runs FIBO-vlm
+  (a Qwen3-VL) locally, so a workflow can read a photo and produce the prose prompt FLUX/Krea2
+  want without leaving Apple Silicon and without a llama.cpp `mmproj` side-file. Three modes:
+  `analyze` (describe the photo), `expand` (a brief into a prompt, no photo), and `renovate`
+  (apply the brief to the real room). FIBO-vlm always answers in structured JSON, so the node
+  flattens it to a paragraph and salvages a truncated reply. Outputs `(prompt, survey)`.
+- **`mflux Depth Map` node (DepthPro).** Generates a depth map inside the workflow, so the
+  depth-ControlNet path is self-contained and needs no external preprocessing.
+- **Live preview and progress bar in the sampler.** The image now streams as it denoises and
+  drives the ComfyUI progress bar; the Cancel button works mid-generation. New `live_preview`
+  and `preview_stride` widgets. `mflux Upscale` seed gains the missing `control_after_generate`.
+- **Openable example workflows** in `example_workflows/` (01–11 plus `INTERIOR_DESIGN_PRO.json`),
+  one per capability, each with an in-canvas note. Generators in `tools/`.
+
 ## [0.6.0]
 
 ### Added
