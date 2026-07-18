@@ -571,7 +571,10 @@ class MfluxModelSampler:
                 "mflux_image": ("MFLUX_IMAGE",),
                 "mask_mode": (["preserve", "inpaint", "off"], {"default": "preserve", "tooltip": "How to use a mask connected on MfluxImage for edit/img2img models that don't inpaint natively (FLUX.2-edit, qwen-edit, krea2, img2img). preserve: painted (white) areas stay pixel-identical to the original — lock windows/doors. inpaint: only painted (white) areas take the edit. off: ignore. (flux-fill uses its mask natively; this does not apply.)"}),
                 "mask_feather": ("INT", {"default": 4, "min": 0, "max": 200, "tooltip": "Gaussian feather (px) on the mask edge for a seamless composite."}),
+                "live_preview": ("BOOLEAN", {"default": True, "tooltip": "Stream the image as it denoises into the node, and drive the progress bar. Also enables the Cancel button mid-generation. Costs one VAE decode per shown step."}),
+                "preview_stride": ("INT", {"default": 2, "min": 1, "max": 20, "tooltip": "Show a preview every N steps (the last step is always shown). 1 = every step (slowest, smoothest). Higher = fewer decodes."}),
             },
+            "hidden": {"unique_id": "UNIQUE_ID"},
         }
 
     RETURN_TYPES = ("IMAGE", "STRING")
@@ -583,7 +586,8 @@ class MfluxModelSampler:
                  steps=0, guidance=0.0, width=1024, height=1024, scheduler="auto",
                  preset="(model default)", strict_caption_validation=False,
                  image=None, image_strength=0.6, mflux_image=None,
-                 mask_mode="preserve", mask_feather=4):
+                 mask_mode="preserve", mask_feather=4,
+                 live_preview=True, preview_stride=2, unique_id=None):
         handle = model
         prompt = _clean_caption_prompt(prompt)
         if handle.free_comfy_first:
@@ -624,7 +628,14 @@ class MfluxModelSampler:
                 "strict_caption_validation": strict_caption_validation,
             }
             forwarded, notes = normalize_and_validate(handle.profile, params_mode, requested, image_paths)
-            gen = handle.instance.generate_image(**forwarded)
+            if live_preview:
+                from .preview import ComfyLivePreview, _RegistryGuard, resolve_latent_creator
+                lc = resolve_latent_creator(handle.family)
+                cb = ComfyLivePreview(handle.instance, lc, node_id=unique_id, stride=int(preview_stride))
+                with _RegistryGuard(handle.instance, cb):
+                    gen = handle.instance.generate_image(**forwarded)
+            else:
+                gen = handle.instance.generate_image(**forwarded)
         finally:
             for p in temps:
                 if p and os.path.exists(p):
@@ -676,7 +687,7 @@ class MfluxUpscale:
             },
             "optional": {
                 "softness": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05}),
-                "seed": ("INT", {"default": 42, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "seed": ("INT", {"default": 42, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "control_after_generate": True}),
                 "quantize": (QUANTIZE_CHOICES, {"default": "none"}),
                 "keep_loaded": ("BOOLEAN", {"default": True}),
                 "free_comfy_first": ("BOOLEAN", {"default": True}),
