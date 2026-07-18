@@ -50,25 +50,31 @@ class MfluxDepthMap:
         from PIL import Image
 
         q = None if quantize == "none" else int(quantize)
-        arr = (image[0].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
-        fd, path = tempfile.mkstemp(suffix=".png", prefix="mflux_depth_in_")
-        os.close(fd)
+        n = int(image.shape[0])
+        maps = []
         try:
-            Image.fromarray(arr).save(path)
             model = _load_depth_pro(q)
-            result = model.create_depth_map(image_path=path)
-        finally:
-            if os.path.exists(path):
+            for i in range(n):  # honor the batch: one depth map per frame, never drop the rest
+                arr = (image[i].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+                fd, path = tempfile.mkstemp(suffix=".png", prefix="mflux_depth_in_")
+                os.close(fd)
                 try:
-                    os.remove(path)
-                except OSError:
-                    pass
-        if not keep_loaded:
-            _DEPTH_CACHE.update(quantize=None, model=None)
+                    Image.fromarray(arr).save(path)
+                    result = model.create_depth_map(image_path=path)
+                finally:
+                    if os.path.exists(path):
+                        try:
+                            os.remove(path)
+                        except OSError:
+                            pass
+                depth = np.asarray(result.depth_image.convert("RGB"), dtype=np.float32) / 255.0
+                if invert:
+                    depth = 1.0 - depth
+                maps.append(np.clip(depth, 0.0, 1.0))
+                print(f"[mflux] DepthMap [{i + 1}/{n}]: {depth.shape[1]}x{depth.shape[0]} "
+                      f"min={result.min_depth:.2f}m max={result.max_depth:.2f}m invert={invert}")
+        finally:
+            if not keep_loaded:
+                _DEPTH_CACHE.update(quantize=None, model=None)
 
-        depth = np.asarray(result.depth_image.convert("RGB"), dtype=np.float32) / 255.0
-        if invert:
-            depth = 1.0 - depth
-        print(f"[mflux] DepthMap: {depth.shape[1]}x{depth.shape[0]} "
-              f"min={result.min_depth:.2f}m max={result.max_depth:.2f}m invert={invert}")
-        return (torch.from_numpy(np.clip(depth, 0.0, 1.0)).unsqueeze(0),)
+        return (torch.from_numpy(np.stack(maps, axis=0)),)

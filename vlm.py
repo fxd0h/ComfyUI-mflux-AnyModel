@@ -202,27 +202,29 @@ class MfluxVLM:
             arr = (image[0].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
             pil = PILImage.fromarray(arr).convert("RGB")
 
-        if is_renovate:
-            # edit() runs FIBO's FIDELITY RULE: change only what the instruction asks, keep the
-            # rest of the real room. It is the only path that honors material/color overrides.
-            # Its signature is fixed (image, edit_instruction, seed) — no temperature/max_tokens.
-            survey = vlm.edit(image=pil, edit_instruction=brief.strip(), seed=int(seed) or None)
-        elif is_analyze:
-            survey = vlm.inspire(image=pil, prompt=None, temperature=float(temperature),
-                                 max_tokens=int(max_tokens), seed=int(seed) or None)
-        else:
-            survey = vlm.generate(prompt=brief.strip(), temperature=float(temperature),
-                                  max_tokens=int(max_tokens), seed=int(seed) or None)
+        try:
+            if is_renovate:
+                # edit() runs FIBO's FIDELITY RULE: change only what the instruction asks, keep the
+                # rest of the real room. It is the only path that honors material/color overrides.
+                # Its signature is fixed (image, edit_instruction, seed) — no temperature/max_tokens.
+                survey = vlm.edit(image=pil, edit_instruction=brief.strip(), seed=int(seed))
+            elif is_analyze:
+                survey = vlm.inspire(image=pil, prompt=None, temperature=float(temperature),
+                                     max_tokens=int(max_tokens), seed=int(seed))
+            else:
+                survey = vlm.generate(prompt=brief.strip(), temperature=float(temperature),
+                                      max_tokens=int(max_tokens), seed=int(seed))
 
-        survey = (survey or "").strip()
-        data = _loads_tolerant(survey)
-        prompt = _to_prose(data)
-        if not prompt:
-            # FIBO went off-script and answered in prose: pass it straight through.
-            prompt = survey
-            print("[mflux] VLM: respuesta no-JSON, la paso tal cual")
-
-        if not keep_loaded:
-            _VLM_CACHE.update(key=None, model=None)
-        print(f"[mflux] VLM {mode.split()[0]}: prompt={len(prompt)} chars, survey={len(survey)} chars")
-        return (prompt, survey)
+            survey = (survey or "").strip()
+            data = _loads_tolerant(survey)
+            prompt = _to_prose(data)
+            if not prompt:
+                # FIBO went off-script and answered in prose: pass it straight through.
+                prompt = survey
+                print("[mflux] VLM: respuesta no-JSON, la paso tal cual")
+            print(f"[mflux] VLM {mode.split()[0]}: prompt={len(prompt)} chars, survey={len(survey)} chars")
+            return (prompt, survey)
+        finally:
+            # evict the cached model even if generation or parsing raised
+            if not keep_loaded:
+                _VLM_CACHE.update(key=None, model=None)

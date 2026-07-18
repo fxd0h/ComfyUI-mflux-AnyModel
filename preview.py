@@ -36,7 +36,7 @@ def resolve_latent_creator(family):
     """
     fam = (family or "").lower()
     for prefix, (module, cls) in sorted(_LATENT_CREATORS.items(), key=lambda kv: -len(kv[0])):
-        if fam.startswith(prefix) or prefix in fam:
+        if fam.startswith(prefix):
             try:
                 return getattr(importlib.import_module(module), cls)
             except Exception:

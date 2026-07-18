@@ -26,7 +26,7 @@ check("ideogram4 resolves", P.resolve_latent_creator("ideogram4").__name__ == "I
 check("qwen resolves", P.resolve_latent_creator("qwen").__name__ == "QwenLatentCreator")
 check("z-image resolves", P.resolve_latent_creator("z-image").__name__ == "ZImageLatentCreator")
 check("flux2 resolves", P.resolve_latent_creator("flux2").__name__ == "Flux2LatentCreator")
-check("unknown family degrades to None", P.resolve_latent_creator("boogu") is None or True)  # boogu has no creator
+check("unknown family degrades to None", P.resolve_latent_creator("boogu") is None)  # boogu has no creator
 check("empty family is None", P.resolve_latent_creator("") is None)
 check("None family is None", P.resolve_latent_creator(None) is None)
 
