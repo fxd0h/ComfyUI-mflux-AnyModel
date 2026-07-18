@@ -7,7 +7,8 @@ All in-canvas text is English.
 """
 import json, os, urllib.request
 
-OI = json.load(urllib.request.urlopen("http://127.0.0.1:8188/object_info"))
+with urllib.request.urlopen("http://127.0.0.1:8188/object_info", timeout=30) as _r:
+    OI = json.load(_r)
 LINKY = {"IMAGE", "MASK", "MFLUX_MODEL", "MFLUX_IMAGE", "MFLUX_LORA", "LATENT", "CONDITIONING", "STRING", "*"}
 
 
@@ -190,7 +191,7 @@ of the path you use.
   brief (~11 min; for real restyling, path B is
   faster and more direct).""", size=(COLW, 400), title="Guide · VLM (optional)")
 vlm = w.add("MfluxVLM", place(C, 300), {
-    "mode": "renovate (aplicá MIS cambios a la foto real)",
+    "mode": "renovate (apply my changes to the real photo)",
     "brief": ("replace the floor with dark walnut, warm modern palette, add a three-seat sofa, "
               "a coffee table and framed art, keep the windows, the doors and the camera viewpoint"),
     "quantize": "8", "temperature": 0.2, "max_tokens": 4096,
@@ -348,6 +349,7 @@ w.link(sampB, 0, ups, "image")
 w.link(ups, 0, save, "images")
 
 out = os.path.expanduser("~/Documents/github/ComfyUI/user/default/workflows/INTERIOR_DESIGN_PRO.json")
-json.dump(w.dump(), open(out, "w"), indent=1, ensure_ascii=False)
+with open(out, "w") as _f:
+    json.dump(w.dump(), _f, indent=1, ensure_ascii=False)
 print("SAVED:", out)
 print(f"nodes={len(w.nodes)} links={len(w.links)} groups={len(w.groups)}")

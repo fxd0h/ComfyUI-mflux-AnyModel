@@ -6,7 +6,8 @@ row of nodes (stride > node width, so nothing overlaps). All text is English.
 """
 import json, os, urllib.request
 
-OI = json.load(urllib.request.urlopen("http://127.0.0.1:8188/object_info"))
+with urllib.request.urlopen("http://127.0.0.1:8188/object_info", timeout=30) as _r:
+    OI = json.load(_r)
 LINKY = {"IMAGE", "MASK", "MFLUX_MODEL", "MFLUX_IMAGE", "MFLUX_LORA", "LATENT", "CONDITIONING", "STRING", "*"}
 OUTDIR = os.path.expanduser("~/Documents/github/ComfyUI/user/default/workflows/mflux_examples")
 os.makedirs(OUTDIR, exist_ok=True)
@@ -78,7 +79,8 @@ def col(i):
 
 
 def save(w, name, ndesc):
-    json.dump(w.dump(), open(os.path.join(OUTDIR, name), "w"), indent=1, ensure_ascii=False)
+    with open(os.path.join(OUTDIR, name), "w") as _f:
+        json.dump(w.dump(), _f, indent=1, ensure_ascii=False)
     print(f"  {name:34} nodes={len(w.nodes)} links={len(w.links)}  ({ndesc})")
 
 
@@ -255,7 +257,7 @@ Turn a photo and/or a brief into a prompt, natively on MLX (no cloud). Modes:
 **expand** (brief → prompt, ~15s), **analyze** (describe a photo, ~40s), **renovate** (apply a brief
 to a photo, ~11 min). Read the result in the display node, or wire `prompt` into any Sampler.""", (1120, 210), title="10 · VLM")
     img = w.add("LoadImage", col(0), {"image": "room.png"}, "Photo (for analyze/renovate)", color=(BLUE, "#233"), size=[340, 300])
-    vlm = w.add("MfluxVLM", col(1), {"mode": "expand (armá la escena desde MI brief, sin foto)",
+    vlm = w.add("MfluxVLM", col(1), {"mode": "expand (build a prompt from my brief, no photo)",
               "brief": "warm modern living room, three-seat sofa, coffee table, dark walnut floor, framed art, plants",
               "quantize": "8"}, "VLM · brief → prompt", color=(ORANGE, "#332"), size=[340, 300])
     disp = w.add("Display Any (rgthree)", col(2), {}, "Prompt out", color=(ORANGE, "#332"), size=[340, 220])

@@ -54,6 +54,8 @@ Restart ComfyUI.
 | **mflux LoRA** | Chainable LoRA feeder (local file, HuggingFace repo, or `repo:filename.safetensors`). Stack several to compose. |
 | **mflux Image** | Typed image feeder: a primary image, an optional mask (native inpaint for fill, or the mask-preserve composite for edit models), and an optional depth/control map (for depth and controlnet models). Chain via `image_in` for multi-image edits. |
 | **mflux Auto Mask** | Segments a room photo (ADE20K SegFormer) and turns a named region (floor / walls / ceiling / windows / doors / furniture / custom) into a mask, for regional restyling without hand-painting. Runs locally on MPS. |
+| **mflux Depth Map** | Generates a depth map from a photo with DepthPro, natively in MLX, so a depth-guided workflow is self-contained (no external preprocessing). |
+| **mflux VLM** | Runs FIBO-vlm (Qwen3-VL) locally to turn a room photo and/or a brief into a prompt. Modes: `analyze` (describe the photo), `expand` (brief into a prompt), `renovate` (apply the brief to the photo). Outputs `(prompt, survey)`. |
 | **mflux Upscale (SeedVR2)** | One-step SeedVR2 upscaler. Loads its own model. |
 
 ## Supported models

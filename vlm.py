@@ -30,9 +30,9 @@ import re
 
 import numpy as np
 
-MODES = ["analyze (mirá la foto y describí el ambiente)",
-         "expand (armá la escena desde MI brief, sin foto)",
-         "renovate (aplicá MIS cambios a la foto real)"]
+MODES = ["analyze (describe the room in the photo)",
+         "expand (build a prompt from my brief, no photo)",
+         "renovate (apply my changes to the real photo)"]
 
 _VLM_CACHE = {"key": None, "model": None}
 
@@ -163,17 +163,17 @@ class MfluxVLM:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "mode": (MODES, {"default": MODES[2], "tooltip": "analyze: describe la foto tal cual es (~40s). expand: arma la escena desde tu brief, sin foto (~15s). renovate: aplica TUS cambios (materiales, colores, luz) a la foto real y mantiene la geometria (~11min, pero es la unica que respeta de verdad lo que pedis)."}),
-                "brief": ("STRING", {"multiline": True, "default": "replace the floor with dark walnut planks, warm modern palette, add a three-seat sofa and an 85-inch TV, cove lighting, keep the windows and layout", "tooltip": "En 'renovate' escribí los CAMBIOS como ordenes ('replace the floor with...', 'repaint the walls...'). En 'expand' es el programa completo. Escribilo en INGLES: el VLM contesta en el idioma del brief y el T5 de FLUX/Krea2 entiende ingles. Ignorado en 'analyze'."}),
+                "mode": (MODES, {"default": MODES[2], "tooltip": "analyze: describe the photo as it is (~40s). expand: build a prompt from your brief, no photo (~15s). renovate: apply YOUR changes (materials, colours, light) to the real photo while keeping its geometry (~11min, but the only mode that truly honours what you ask)."}),
+                "brief": ("STRING", {"multiline": True, "default": "replace the floor with dark walnut planks, warm modern palette, add a three-seat sofa and an 85-inch TV, cove lighting, keep the windows and layout", "tooltip": "In 'renovate' write the CHANGES as commands ('replace the floor with...', 'repaint the walls...'). In 'expand' it is the full program. Write it in ENGLISH: the VLM answers in the brief's language and FLUX/Krea2's T5 understands English. Ignored in 'analyze'."}),
             },
             "optional": {
-                "image": ("IMAGE", {"tooltip": "La foto del ambiente. Requerida en 'analyze' y 'analyze + expand'; ignorada en 'expand'."}),
-                "model_id": ("STRING", {"default": "briaai/FIBO-vlm", "tooltip": "Pesos del VLM (Qwen3-VL en MLX). Tiene que ser briaai/FIBO-vlm: un Qwen3-VL generico NO carga (otro layout de pesos)."}),
-                "quantize": (["8", "4", "none"], {"default": "8", "tooltip": "8 bits entra comodo y carga en ~6s."}),
-                "temperature": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Bajo = obediente y factual. Alto = explora."}),
-                "max_tokens": ("INT", {"default": 4096, "min": 256, "max": 8192, "tooltip": "El JSON de FIBO es largo: con menos de ~1500 se corta. Si se corta igual, el nodo rescata lo que llego. En 'renovate' lo fija el metodo edit() (4096)."}),
+                "image": ("IMAGE", {"tooltip": "The room photo. Required in 'analyze' and 'renovate'; ignored in 'expand'."}),
+                "model_id": ("STRING", {"default": "briaai/FIBO-vlm", "tooltip": "VLM weights (Qwen3-VL in MLX). Must be briaai/FIBO-vlm: a generic Qwen3-VL will NOT load (different weight layout)."}),
+                "quantize": (["8", "4", "none"], {"default": "8", "tooltip": "8-bit fits comfortably and loads in ~6s."}),
+                "temperature": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "Low = obedient and factual. High = explores."}),
+                "max_tokens": ("INT", {"default": 4096, "min": 256, "max": 8192, "tooltip": "FIBO's JSON is long: under ~1500 it gets cut off. If it is cut anyway, the node salvages what arrived. In 'renovate' the edit() method fixes it at 4096."}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "control_after_generate": True}),
-                "keep_loaded": ("BOOLEAN", {"default": True, "tooltip": "Dejar el VLM en memoria entre corridas (~9GB en 8 bits)."}),
+                "keep_loaded": ("BOOLEAN", {"default": True, "tooltip": "Keep the VLM resident between runs (~9GB at 8-bit)."}),
             },
         }
 
@@ -191,9 +191,9 @@ class MfluxVLM:
         needs_image = is_analyze or is_renovate
         needs_brief = is_renovate or mode.startswith("expand")
         if needs_image and image is None:
-            raise ValueError("Los modos 'analyze' y 'renovate' necesitan la foto: conectá 'image'.")
+            raise ValueError("Modes 'analyze' and 'renovate' need the photo: connect 'image'.")
         if needs_brief and not (brief or "").strip():
-            raise ValueError(f"El modo '{mode.split()[0]}' necesita un brief.")
+            raise ValueError(f"Mode '{mode.split()[0]}' needs a brief.")
 
         vlm = _load_vlm(model_id, None if quantize == "none" else int(quantize))
 
@@ -221,7 +221,7 @@ class MfluxVLM:
             if not prompt:
                 # FIBO went off-script and answered in prose: pass it straight through.
                 prompt = survey
-                print("[mflux] VLM: respuesta no-JSON, la paso tal cual")
+                print("[mflux] VLM: non-JSON reply, passing it through as-is")
             print(f"[mflux] VLM {mode.split()[0]}: prompt={len(prompt)} chars, survey={len(survey)} chars")
             return (prompt, survey)
         finally:

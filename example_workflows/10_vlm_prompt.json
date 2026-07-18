@@ -108,7 +108,7 @@
     "Node name for S&R": "MfluxVLM"
    },
    "widgets_values": [
-    "expand (armá la escena desde MI brief, sin foto)",
+    "expand (build a prompt from my brief, no photo)",
     "warm modern living room, three-seat sofa, coffee table, dark walnut floor, framed art, plants",
     "briaai/FIBO-vlm",
     "8",
