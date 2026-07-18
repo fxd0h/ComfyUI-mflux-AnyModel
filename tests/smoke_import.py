@@ -15,8 +15,14 @@ import mflux_dispatch as D  # must not raise even when fork models are absent
 import capability as C      # noqa: F401
 import nodes                # noqa: F401  — the ComfyUI entry surface
 import segmentation as Seg  # noqa: F401  — the AutoMask node (torch/transformers, no fork dep)
+import depth_map as DM      # noqa: F401  — the DepthPro node (lazy mflux import inside the method)
+import vlm as V             # noqa: F401  — the FIBO-vlm node (lazy FiboVLM import inside _load_vlm)
+import preview as P         # noqa: F401  — the live-preview bridge (lazy comfy/mflux imports)
 
 assert Seg.MfluxAutoMask.RETURN_TYPES[0] == "MASK", "AutoMask must expose a MASK output"
+assert DM.MfluxDepthMap.RETURN_TYPES == ("IMAGE",), "DepthMap must output an IMAGE"
+assert V.MfluxVLM.RETURN_NAMES == ("prompt", "survey"), "VLM must output (prompt, survey)"
+assert P.resolve_latent_creator("flux") is not None, "flux latent creator must resolve"
 
 # base families that exist in ANY mflux must still resolve to a real class
 cls, fam = D.pick_model_class("schnell")

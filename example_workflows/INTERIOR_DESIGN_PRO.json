@@ -1,0 +1,1714 @@
+{
+ "last_node_id": 33,
+ "last_link_id": 25,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "MarkdownNote",
+   "pos": [
+    0.0,
+    -840.0
+   ],
+   "size": [
+    940.0,
+    720.0
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "READ ME FIRST",
+   "properties": {},
+   "widgets_values": [
+    "# 🏠 Interior Design · MLX / Apple Silicon\n\nEverything runs **locally** (mflux + MLX). No cloud.\n\n## The 3 paths — turn ONE on at a time with the **Bypasser** (top-left)\n\n| Path | What for | Model |\n|---|---|---|\n| **B · Restyle** ⭐ | Keeps YOUR room AND adds/replaces furniture, floor, materials. The best path. | FLUX.2-klein-edit |\n| **A · Strict perspective** | Locks the 3D viewpoint but EMPTIES the room (keeps no furniture, adds none). Niche. | FLUX.1 + depth ControlNet |\n| **C · Mood board** | Explore styles from reference photos. Does NOT keep your room. | FLUX.1 Redux |\n\n**Start with path B.** It is an edit model: give it your photo and an instruction, and it restyles while keeping the rest. No mask = the whole room; with a mask = one region only. Fast (~10-40s) and needs no VLM. Path A only locks a strict perspective and leaves the room empty.\n\n## Workflow\n1. Load your photo into **① Room photo**.\n2. In **path B**, write the changes as commands (in English).\n3. Generate, and watch the **live preview** as it runs.\n4. Compare in **⑦ Before / After** and enlarge with **⑦ Upscale**.\n\n## Several seeds at once\nSet **Batch count = N** on the **Run** button and leave the `seed` on **increment**. Each result lands in the gallery and the live preview shows each one as it renders.\n\n## Rules that pay off\n- Write changes as commands: \"add...\", \"replace...\", \"remove...\", \"repaint...\", \"keep...\".\n- End with **\"keep the room, the windows and the viewpoint\"**: it anchors what you do NOT want touched.\n- Path B can **replace objects**: \"replace the TV with a fireplace\", \"replace the speakers with plants\".\n- If a stock-style watermark appears, the \"no watermark, no text\" phrase in path B's prompt kills it; if it still shows, change the seed."
+   ],
+   "color": "#2a363b",
+   "bgcolor": "#1e2a30"
+  },
+  {
+   "id": 2,
+   "type": "Fast Groups Bypasser [Eclipse]",
+   "pos": [
+    0.0,
+    0.0
+   ],
+   "size": [
+    400,
+    240
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "oc",
+     "type": "*",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Fast Groups Bypasser [Eclipse]"
+   },
+   "widgets_values": [],
+   "title": "⚡ Turn paths on/off",
+   "color": "#8a4",
+   "bgcolor": "#252"
+  },
+  {
+   "id": 3,
+   "type": "LoadImage",
+   "pos": [
+    0.0,
+    270.0
+   ],
+   "size": [
+    400,
+    320
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      1,
+      3,
+      5,
+      7,
+      22
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "room.png"
+   ],
+   "title": "① Room photo",
+   "color": "#3f789e",
+   "bgcolor": "#233"
+  },
+  {
+   "id": 4,
+   "type": "LoadImage",
+   "pos": [
+    0.0,
+    620.0
+   ],
+   "size": [
+    400,
+    320
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      16
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "room.png"
+   ],
+   "title": "② Style reference A",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 5,
+   "type": "LoadImage",
+   "pos": [
+    0.0,
+    970.0
+   ],
+   "size": [
+    400,
+    320
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      18
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "room.png"
+   ],
+   "title": "② Style reference B",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 6,
+   "type": "MarkdownNote",
+   "pos": [
+    460.0,
+    0.0
+   ],
+   "size": [
+    400.0,
+    300.0
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Guide · Analysis",
+   "properties": {},
+   "widgets_values": [
+    "### ② Automatic analysis\n\n**Depth (DepthPro, MLX)** → feeds path A.\nNear = white. Do NOT invert: that is the\nconvention the depth models here expect.\n\n**Auto-mask (ADE20K)** → optional for path B\n(region edits). Pick a region: `floor`, `walls`,\n`ceiling`, `windows`, `doors`, `openings`,\n`surfaces`, `furniture`, or `custom` + `custom_classes`.\n\n`dilate` covers edges · `feather` softens the seam ·\n`invert` = everything EXCEPT that region.\n\nThe two previews show what was detected before\nyou spend a generation."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 7,
+   "type": "MfluxDepthMap",
+   "pos": [
+    460.0,
+    330.0
+   ],
+   "size": [
+    400,
+    130
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 1
+    }
+   ],
+   "outputs": [
+    {
+     "name": "depth_map",
+     "type": "IMAGE",
+     "links": [
+      2,
+      12
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxDepthMap"
+   },
+   "widgets_values": [
+    "none",
+    true,
+    false
+   ],
+   "title": "② Depth map (DepthPro)",
+   "color": "#37734a",
+   "bgcolor": "#232"
+  },
+  {
+   "id": 8,
+   "type": "PreviewImage",
+   "pos": [
+    460.0,
+    490.0
+   ],
+   "size": [
+    400,
+    260
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "👁 Depth",
+   "color": "#555",
+   "bgcolor": "#222"
+  },
+  {
+   "id": 9,
+   "type": "MfluxAutoMask",
+   "pos": [
+    460.0,
+    780.0
+   ],
+   "size": [
+    400,
+    320
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mask",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 0
+    },
+    {
+     "name": "mask_image",
+     "type": "IMAGE",
+     "links": [
+      4,
+      8
+     ],
+     "slot_index": 1
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 2
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxAutoMask"
+   },
+   "widgets_values": [
+    "floor",
+    "",
+    false,
+    6,
+    6,
+    "nvidia/segformer-b2-finetuned-ade-512-512"
+   ],
+   "title": "② Auto-mask (ADE20K)",
+   "color": "#37734a",
+   "bgcolor": "#232"
+  },
+  {
+   "id": 10,
+   "type": "PreviewImage",
+   "pos": [
+    460.0,
+    1130.0
+   ],
+   "size": [
+    400,
+    260
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 4
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "👁 Mask",
+   "color": "#555",
+   "bgcolor": "#222"
+  },
+  {
+   "id": 11,
+   "type": "MarkdownNote",
+   "pos": [
+    920.0,
+    0.0
+   ],
+   "size": [
+    400.0,
+    400.0
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Guide · VLM (optional)",
+   "properties": {},
+   "widgets_values": [
+    "### ③ VLM · OPTIONAL (turned off)\n\nYou don't need it for path B: there you type the\ninstruction directly. This group is a helper to\n**draft or enrich** a prompt if you'd rather not\nwrite it by hand.\n\n**It is muted** (grey). To use it: right-click both\nnodes → **Mode → Always**, run, read the `prompt`\nin **Prompt final**, and copy it into the `prompt`\nof the path you use.\n\n**FIBO-vlm**, a native-MLX Qwen3-VL (local, no cloud). Modes:\n- **expand** → builds a prompt from your brief, no photo (~15s).\n- **analyze** → describes your photo as it is (~40s).\n- **renovate** → looks at your photo and applies the\n  brief (~11 min; for real restyling, path B is\n  faster and more direct)."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 12,
+   "type": "MfluxVLM",
+   "pos": [
+    920.0,
+    430.0
+   ],
+   "size": [
+    400,
+    300
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 2,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 5
+    }
+   ],
+   "outputs": [
+    {
+     "name": "prompt",
+     "type": "STRING",
+     "links": [
+      6
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "survey",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxVLM"
+   },
+   "widgets_values": [
+    "renovate (apply my changes to the real photo)",
+    "replace the floor with dark walnut, warm modern palette, add a three-seat sofa, a coffee table and framed art, keep the windows, the doors and the camera viewpoint",
+    "briaai/FIBO-vlm",
+    "8",
+    0.2,
+    4096,
+    0,
+    "randomize",
+    true
+   ],
+   "title": "③ VLM · brief → prompt (OPTIONAL, off)",
+   "color": "#9e6b3f",
+   "bgcolor": "#332"
+  },
+  {
+   "id": 13,
+   "type": "Display Any (rgthree)",
+   "pos": [
+    920.0,
+    760.0
+   ],
+   "size": [
+    400,
+    180
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 2,
+   "inputs": [
+    {
+     "name": "source",
+     "type": "*",
+     "link": 6
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "Display Any (rgthree)"
+   },
+   "widgets_values": [],
+   "title": "③ Prompt final (read it)",
+   "color": "#9e6b3f",
+   "bgcolor": "#332"
+  },
+  {
+   "id": 14,
+   "type": "MarkdownNote",
+   "pos": [
+    1380.0,
+    0.0
+   ],
+   "size": [
+    400.0,
+    430.0
+   ],
+   "flags": {},
+   "order": 13,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Guide · Path B (main)",
+   "properties": {},
+   "widgets_values": [
+    "### Ⓑ Restyle · THE BEST PATH ⭐\n\n**Keeps YOUR room and applies your changes:** adds\nfurniture, swaps the floor, materials, light, and\nleaves the rest as is. Edit model (FLUX.2-klein-edit):\ntakes your photo + an instruction. Fast (~10-40s)\nand needs NO VLM.\n\n**Write the `prompt` as COMMANDS, in English:**\n> add a three-seat sofa and a coffee table,\n> replace the floor with dark walnut,\n> keep the room, the windows and the TV\n\n`mask_mode`:\n- **off** → restyles the WHOLE room (the usual here).\n- **inpaint** → changes ONLY region ② (the auto-mask\n  is wired): \"restyle the floor only\".\n- **preserve** → locks what is painted (windows/doors)\n  and changes the rest.\n\nThe *\"no watermark, no text\"* phrase in the prompt\nkills the stock watermark; if it still shows, change\nthe seed."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 15,
+   "type": "MfluxModelLoader",
+   "pos": [
+    1380.0,
+    460.0
+   ],
+   "size": [
+    400,
+    260
+   ],
+   "flags": {},
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "lora",
+     "type": "MFLUX_LORA",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "links": [
+      9
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelLoader"
+   },
+   "widgets_values": [
+    "flux2-klein-edit",
+    "8",
+    "(none)",
+    "",
+    "",
+    1.0,
+    true,
+    true
+   ],
+   "title": "Ⓑ Loader · FLUX.2-klein-edit",
+   "color": "#37734a",
+   "bgcolor": "#232"
+  },
+  {
+   "id": 16,
+   "type": "MfluxImage",
+   "pos": [
+    1380.0,
+    750.0
+   ],
+   "size": [
+    400,
+    120
+   ],
+   "flags": {},
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 7
+    },
+    {
+     "name": "image_in",
+     "type": "MFLUX_IMAGE",
+     "link": null
+    },
+    {
+     "name": "mask",
+     "type": "IMAGE",
+     "link": 8
+    },
+    {
+     "name": "map_image",
+     "type": "IMAGE",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "links": [
+      10
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxImage"
+   },
+   "widgets_values": [
+    0.6
+   ],
+   "title": "Ⓑ Photo (+ optional mask)",
+   "color": "#37734a",
+   "bgcolor": "#232"
+  },
+  {
+   "id": 17,
+   "type": "MfluxModelSampler",
+   "pos": [
+    1380.0,
+    900.0
+   ],
+   "size": [
+    400,
+    440
+   ],
+   "flags": {},
+   "order": 16,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "link": 9
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "link": 10
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      11,
+      23,
+      24
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelSampler"
+   },
+   "widgets_values": [
+    "add a large three-seat grey fabric sofa and a low wooden coffee table in the center, replace the floor with dark walnut wood, warm modern styling, keep the room, the windows, the TV and the camera viewpoint. Clean professional interior photograph, no watermark, no text, no logo.",
+    "auto",
+    "",
+    3,
+    "randomize",
+    0,
+    0.0,
+    1024,
+    768,
+    "auto",
+    "(model default)",
+    false,
+    0.6,
+    "off",
+    6,
+    true,
+    2
+   ],
+   "title": "Ⓑ Sampler · write your changes here",
+   "color": "#37734a",
+   "bgcolor": "#232"
+  },
+  {
+   "id": 18,
+   "type": "PreviewImage",
+   "pos": [
+    1380.0,
+    1370.0
+   ],
+   "size": [
+    400,
+    300
+   ],
+   "flags": {},
+   "order": 17,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 11
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "👁 Ⓑ Result",
+   "color": "#555",
+   "bgcolor": "#222"
+  },
+  {
+   "id": 19,
+   "type": "MarkdownNote",
+   "pos": [
+    1840.0,
+    0.0
+   ],
+   "size": [
+    400.0,
+    520.0
+   ],
+   "flags": {},
+   "order": 18,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Guide · Path A",
+   "properties": {},
+   "widgets_values": [
+    "### Ⓐ Strict perspective · depth ControlNet\n\n**Secondary. Use path B to actually restyle.**\n\nThis locks your photo's 3D viewpoint, but because\ndepth is only geometry (it doesn't know what\nfurniture is there), it **EMPTIES the room**: it\nkeeps no TV/sofa and adds no new furniture (depth\nresists it). Good for restyling a near-empty room or\nfixing an exact perspective, not for furnishing.\n\n**depth** (Union-Pro-2.0) ← the ② map · strength 0.7\nlocks the 3D geometry.\n\n## TWO things you MUST set right\n1. **width/height = YOUR photo's aspect.**\n   Landscape → 1024 x 768. Portrait → 768 x 1024.\n   Square on a landscape photo squashes the geometry\n   into a different room.\n2. **steps 24.** FLUX.1-dev needs ~24; with 8 the\n   ControlNet can't lock the structure.\n\n*Optional, to also lock existing objects: add a 2nd\nline in controlnet_path with InstantX Canny and a 2nd\nmflux Image (your photo, strength ~0.3). It pins edges\nbut barely restyles and can add artifacts.*\n\nNeeds FLUX.1-dev (~31G) + Union-Pro-2.0 (~4G)."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 20,
+   "type": "MfluxModelLoader",
+   "pos": [
+    1840.0,
+    550.0
+   ],
+   "size": [
+    400,
+    260
+   ],
+   "flags": {},
+   "order": 19,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "lora",
+     "type": "MFLUX_LORA",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "links": [
+      13
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelLoader"
+   },
+   "widgets_values": [
+    "dev-controlnet-canny",
+    "8",
+    "(none)",
+    "",
+    "Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0",
+    1.0,
+    true,
+    true
+   ],
+   "title": "Ⓐ Loader · FLUX.1 + depth ControlNet",
+   "color": "#9e3f3f",
+   "bgcolor": "#322"
+  },
+  {
+   "id": 21,
+   "type": "MfluxImage",
+   "pos": [
+    1840.0,
+    840.0
+   ],
+   "size": [
+    400,
+    120
+   ],
+   "flags": {},
+   "order": 20,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 12
+    },
+    {
+     "name": "image_in",
+     "type": "MFLUX_IMAGE",
+     "link": null
+    },
+    {
+     "name": "mask",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "map_image",
+     "type": "IMAGE",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "links": [
+      14
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxImage"
+   },
+   "widgets_values": [
+    0.7
+   ],
+   "title": "Ⓐ ControlNet ← depth (0.7)",
+   "color": "#9e3f3f",
+   "bgcolor": "#322"
+  },
+  {
+   "id": 22,
+   "type": "MfluxModelSampler",
+   "pos": [
+    1840.0,
+    990.0
+   ],
+   "size": [
+    400,
+    440
+   ],
+   "flags": {},
+   "order": 21,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "link": 13
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "link": 14
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      15
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelSampler"
+   },
+   "widgets_values": [
+    "a warm modern living room, dark walnut floor, cream walls, framed art, soft daylight",
+    "override",
+    "",
+    11,
+    "randomize",
+    24,
+    3.5,
+    1024,
+    768,
+    "auto",
+    "(model default)",
+    false,
+    0.6,
+    "preserve",
+    4,
+    true,
+    2
+   ],
+   "title": "Ⓐ Sampler · steps 24, match your photo aspect",
+   "color": "#9e3f3f",
+   "bgcolor": "#322"
+  },
+  {
+   "id": 23,
+   "type": "PreviewImage",
+   "pos": [
+    1840.0,
+    1460.0
+   ],
+   "size": [
+    400,
+    300
+   ],
+   "flags": {},
+   "order": 22,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 15
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "👁 Ⓐ Result",
+   "color": "#555",
+   "bgcolor": "#222"
+  },
+  {
+   "id": 24,
+   "type": "MarkdownNote",
+   "pos": [
+    2300.0,
+    0.0
+   ],
+   "size": [
+    400.0,
+    300.0
+   ],
+   "flags": {},
+   "order": 23,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Guide · Path C",
+   "properties": {},
+   "widgets_values": [
+    "### Ⓒ Mood board · Redux\n\nBlends the **style** of your reference photos ② with\nthe prompt. Each reference carries its own weight:\n1.0 dominates, 0.4 barely tints.\n\n**IMPORTANT:** Redux generates a **new** image in that\nstyle. It does **NOT keep your room**. Use it to\nexplore a look, not to restyle your living room. For\nthat, path B.\n\nNeeds FLUX.1-dev + Redux (~32G)."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 25,
+   "type": "MfluxModelLoader",
+   "pos": [
+    2300.0,
+    330.0
+   ],
+   "size": [
+    400,
+    260
+   ],
+   "flags": {},
+   "order": 24,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "lora",
+     "type": "MFLUX_LORA",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "links": [
+      19
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelLoader"
+   },
+   "widgets_values": [
+    "dev-redux",
+    "8",
+    "(none)",
+    "",
+    "",
+    1.0,
+    true,
+    true
+   ],
+   "title": "Ⓒ Loader · FLUX.1 Redux",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 26,
+   "type": "MfluxImage",
+   "pos": [
+    2300.0,
+    620.0
+   ],
+   "size": [
+    400,
+    120
+   ],
+   "flags": {},
+   "order": 25,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 16
+    },
+    {
+     "name": "image_in",
+     "type": "MFLUX_IMAGE",
+     "link": null
+    },
+    {
+     "name": "mask",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "map_image",
+     "type": "IMAGE",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "links": [
+      17
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxImage"
+   },
+   "widgets_values": [
+    1.0
+   ],
+   "title": "Ⓒ Ref A (1.0)",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 27,
+   "type": "MfluxImage",
+   "pos": [
+    2300.0,
+    770.0
+   ],
+   "size": [
+    400,
+    120
+   ],
+   "flags": {},
+   "order": 26,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 18
+    },
+    {
+     "name": "image_in",
+     "type": "MFLUX_IMAGE",
+     "link": 17
+    },
+    {
+     "name": "mask",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "map_image",
+     "type": "IMAGE",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "links": [
+      20
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxImage"
+   },
+   "widgets_values": [
+    0.5
+   ],
+   "title": "Ⓒ Ref B (0.5)",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 28,
+   "type": "MfluxModelSampler",
+   "pos": [
+    2300.0,
+    920.0
+   ],
+   "size": [
+    400,
+    440
+   ],
+   "flags": {},
+   "order": 27,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "link": 19
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "link": 20
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      21
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelSampler"
+   },
+   "widgets_values": [
+    "a bright modern living room interior in the referenced style",
+    "auto",
+    "",
+    42,
+    "randomize",
+    0,
+    2.5,
+    1024,
+    1024,
+    "auto",
+    "(model default)",
+    false,
+    0.6,
+    "preserve",
+    4,
+    true,
+    2
+   ],
+   "title": "Ⓒ Sampler",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 29,
+   "type": "PreviewImage",
+   "pos": [
+    2300.0,
+    1390.0
+   ],
+   "size": [
+    400,
+    300
+   ],
+   "flags": {},
+   "order": 28,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 21
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "👁 Ⓒ Result",
+   "color": "#555",
+   "bgcolor": "#222"
+  },
+  {
+   "id": 30,
+   "type": "MarkdownNote",
+   "pos": [
+    2760.0,
+    0.0
+   ],
+   "size": [
+    400.0,
+    300.0
+   ],
+   "flags": {},
+   "order": 29,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "Guide · Output",
+   "properties": {},
+   "widgets_values": [
+    "### ⑦ Output\n\n**Before / After**: drag the divider over the image\nto compare. `image_b` comes from **path B** (the main\none); rewire it if you use another path.\n\n**Upscale (SeedVR2)**: one step, MLX. `resolution`\ntakes `2x`, `1.5x` or a short-edge target in pixels\n(e.g. `1080`). It is its own model, loaded separately.\n\n**Save**: goes to `ComfyUI/output/`."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 31,
+   "type": "Image Comparer (rgthree)",
+   "pos": [
+    2760.0,
+    330.0
+   ],
+   "size": [
+    400,
+    380
+   ],
+   "flags": {},
+   "order": 30,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image_a",
+     "type": "IMAGE",
+     "link": 22
+    },
+    {
+     "name": "image_b",
+     "type": "IMAGE",
+     "link": 23
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "Image Comparer (rgthree)"
+   },
+   "widgets_values": [],
+   "title": "⑦ Before / After",
+   "color": "#555",
+   "bgcolor": "#222"
+  },
+  {
+   "id": 32,
+   "type": "MfluxUpscale",
+   "pos": [
+    2760.0,
+    740.0
+   ],
+   "size": [
+    400,
+    230
+   ],
+   "flags": {},
+   "order": 31,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 24
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      25
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxUpscale"
+   },
+   "widgets_values": [
+    "seedvr2-3b",
+    "2x",
+    0.0,
+    42,
+    "randomize",
+    "none",
+    true,
+    true
+   ],
+   "title": "⑦ Upscale (SeedVR2)",
+   "color": "#555",
+   "bgcolor": "#222"
+  },
+  {
+   "id": 33,
+   "type": "SaveImage",
+   "pos": [
+    2760.0,
+    1000.0
+   ],
+   "size": [
+    400,
+    320
+   ],
+   "flags": {},
+   "order": 32,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 25
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SaveImage"
+   },
+   "widgets_values": [
+    "interior"
+   ],
+   "title": "⑦ Save",
+   "color": "#555",
+   "bgcolor": "#222"
+  }
+ ],
+ "links": [
+  [
+   1,
+   3,
+   0,
+   7,
+   0,
+   "IMAGE"
+  ],
+  [
+   2,
+   7,
+   0,
+   8,
+   0,
+   "IMAGE"
+  ],
+  [
+   3,
+   3,
+   0,
+   9,
+   0,
+   "IMAGE"
+  ],
+  [
+   4,
+   9,
+   1,
+   10,
+   0,
+   "IMAGE"
+  ],
+  [
+   5,
+   3,
+   0,
+   12,
+   0,
+   "IMAGE"
+  ],
+  [
+   6,
+   12,
+   0,
+   13,
+   0,
+   "STRING"
+  ],
+  [
+   7,
+   3,
+   0,
+   16,
+   0,
+   "IMAGE"
+  ],
+  [
+   8,
+   9,
+   1,
+   16,
+   2,
+   "IMAGE"
+  ],
+  [
+   9,
+   15,
+   0,
+   17,
+   0,
+   "MFLUX_MODEL"
+  ],
+  [
+   10,
+   16,
+   0,
+   17,
+   2,
+   "MFLUX_IMAGE"
+  ],
+  [
+   11,
+   17,
+   0,
+   18,
+   0,
+   "IMAGE"
+  ],
+  [
+   12,
+   7,
+   0,
+   21,
+   0,
+   "IMAGE"
+  ],
+  [
+   13,
+   20,
+   0,
+   22,
+   0,
+   "MFLUX_MODEL"
+  ],
+  [
+   14,
+   21,
+   0,
+   22,
+   2,
+   "MFLUX_IMAGE"
+  ],
+  [
+   15,
+   22,
+   0,
+   23,
+   0,
+   "IMAGE"
+  ],
+  [
+   16,
+   4,
+   0,
+   26,
+   0,
+   "IMAGE"
+  ],
+  [
+   17,
+   26,
+   0,
+   27,
+   1,
+   "MFLUX_IMAGE"
+  ],
+  [
+   18,
+   5,
+   0,
+   27,
+   0,
+   "IMAGE"
+  ],
+  [
+   19,
+   25,
+   0,
+   28,
+   0,
+   "MFLUX_MODEL"
+  ],
+  [
+   20,
+   27,
+   0,
+   28,
+   2,
+   "MFLUX_IMAGE"
+  ],
+  [
+   21,
+   28,
+   0,
+   29,
+   0,
+   "IMAGE"
+  ],
+  [
+   22,
+   3,
+   0,
+   31,
+   0,
+   "IMAGE"
+  ],
+  [
+   23,
+   17,
+   0,
+   31,
+   1,
+   "IMAGE"
+  ],
+  [
+   24,
+   17,
+   0,
+   32,
+   0,
+   "IMAGE"
+  ],
+  [
+   25,
+   32,
+   0,
+   33,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [
+  {
+   "title": "① INPUTS · your images",
+   "bounding": [
+    -22.0,
+    214.0,
+    444.0,
+    1098.0
+   ],
+   "color": "#3f789e",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "title": "② ANALYSIS · depth + regions",
+   "bounding": [
+    438.0,
+    274.0,
+    444.0,
+    1138.0
+   ],
+   "color": "#37734a",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "title": "③ VLM (OPTIONAL) · enable the group to use it",
+   "bounding": [
+    898.0,
+    374.0,
+    444.0,
+    588.0
+   ],
+   "color": "#9e6b3f",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "title": "Ⓑ PATH B · RESTYLE (keeps your room) ⭐",
+   "bounding": [
+    1358.0,
+    404.0,
+    444.0,
+    1288.0
+   ],
+   "color": "#37734a",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "title": "Ⓐ PATH A · strict perspective (depth)",
+   "bounding": [
+    1818.0,
+    494.0,
+    444.0,
+    1288.0
+   ],
+   "color": "#9e3f3f",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "title": "Ⓒ PATH C · mood board (Redux)",
+   "bounding": [
+    2278.0,
+    274.0,
+    444.0,
+    1438.0
+   ],
+   "color": "#7b3f9e",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "title": "⑦ OUTPUT · compare, enlarge, save",
+   "bounding": [
+    2738.0,
+    274.0,
+    444.0,
+    1068.0
+   ],
+   "color": "#555",
+   "font_size": 24,
+   "flags": {}
+  }
+ ],
+ "config": {},
+ "extra": {},
+ "version": 0.4
+}

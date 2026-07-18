@@ -6,6 +6,8 @@ from .nodes import (
     MfluxUpscale,
 )
 from .segmentation import MfluxAutoMask
+from .depth_map import MfluxDepthMap
+from .vlm import MfluxVLM
 
 NODE_CLASS_MAPPINGS = {
     "MfluxModelLoader": MfluxModelLoader,
@@ -14,6 +16,8 @@ NODE_CLASS_MAPPINGS = {
     "MfluxImage": MfluxImage,
     "MfluxUpscale": MfluxUpscale,
     "MfluxAutoMask": MfluxAutoMask,
+    "MfluxDepthMap": MfluxDepthMap,
+    "MfluxVLM": MfluxVLM,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -23,6 +27,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MfluxImage": "mflux Image",
     "MfluxUpscale": "mflux Upscale (SeedVR2)",
     "MfluxAutoMask": "mflux Auto Mask (interior segmentation)",
+    "MfluxDepthMap": "mflux Depth Map (DepthPro)",
+    "MfluxVLM": "mflux VLM (FIBO-vlm, room brief)",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

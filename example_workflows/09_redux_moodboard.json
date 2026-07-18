@@ -1,0 +1,436 @@
+{
+ "last_node_id": 8,
+ "last_link_id": 6,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "MarkdownNote",
+   "pos": [
+    20.0,
+    20.0
+   ],
+   "size": [
+    1200.0,
+    210.0
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "09 · Redux mood board",
+   "properties": {},
+   "widgets_values": [
+    "# 09 · Mood board (Redux style transfer)\n\nTransfer the **style** of one or more reference photos onto a new image. Each reference has its own\nweight (`strength`): 1.0 dominates, 0.4 barely tints. Chain **mflux Image** nodes via `image_in` to\nblend several. Redux makes a NEW image in that style; it does not keep a specific room."
+   ],
+   "color": "#2a363b",
+   "bgcolor": "#1e2a30"
+  },
+  {
+   "id": 2,
+   "type": "LoadImage",
+   "pos": [
+    20.0,
+    300.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      1
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "room.png"
+   ],
+   "title": "Style ref A",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 3,
+   "type": "LoadImage",
+   "pos": [
+    20.0,
+    640.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      3
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "room.png"
+   ],
+   "title": "Style ref B",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 4,
+   "type": "MfluxModelLoader",
+   "pos": [
+    380.0,
+    300.0
+   ],
+   "size": [
+    340,
+    260
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "lora",
+     "type": "MFLUX_LORA",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "links": [
+      4
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelLoader"
+   },
+   "widgets_values": [
+    "dev-redux",
+    "8",
+    "(none)",
+    "",
+    "",
+    1.0,
+    true,
+    true
+   ],
+   "title": "Loader · FLUX.1 Redux",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 5,
+   "type": "MfluxImage",
+   "pos": [
+    740.0,
+    300.0
+   ],
+   "size": [
+    340,
+    120
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 1
+    },
+    {
+     "name": "image_in",
+     "type": "MFLUX_IMAGE",
+     "link": null
+    },
+    {
+     "name": "mask",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "map_image",
+     "type": "IMAGE",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "links": [
+      2
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxImage"
+   },
+   "widgets_values": [
+    1.0
+   ],
+   "title": "Ref A (1.0)",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 6,
+   "type": "MfluxImage",
+   "pos": [
+    740.0,
+    500.0
+   ],
+   "size": [
+    340,
+    120
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": 3
+    },
+    {
+     "name": "image_in",
+     "type": "MFLUX_IMAGE",
+     "link": 2
+    },
+    {
+     "name": "mask",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "map_image",
+     "type": "IMAGE",
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "links": [
+      5
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxImage"
+   },
+   "widgets_values": [
+    0.5
+   ],
+   "title": "Ref B (0.5)",
+   "color": "#7b3f9e",
+   "bgcolor": "#323"
+  },
+  {
+   "id": 7,
+   "type": "MfluxModelSampler",
+   "pos": [
+    1100.0,
+    300.0
+   ],
+   "size": [
+    340,
+    440
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MFLUX_MODEL",
+     "link": 4
+    },
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "name": "mflux_image",
+     "type": "MFLUX_IMAGE",
+     "link": 5
+    }
+   ],
+   "outputs": [
+    {
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      6
+     ],
+     "slot_index": 0
+    },
+    {
+     "name": "info",
+     "type": "STRING",
+     "links": [],
+     "slot_index": 1
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "MfluxModelSampler"
+   },
+   "widgets_values": [
+    "a bright modern living room interior in the referenced style",
+    "auto",
+    "",
+    42,
+    "randomize",
+    0,
+    2.5,
+    1024,
+    1024,
+    "auto",
+    "(model default)",
+    false,
+    0.6,
+    "preserve",
+    4,
+    true,
+    2
+   ],
+   "title": "Sampler",
+   "color": "#37734a",
+   "bgcolor": "#232"
+  },
+  {
+   "id": 8,
+   "type": "PreviewImage",
+   "pos": [
+    1460.0,
+    300.0
+   ],
+   "size": [
+    340,
+    300
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 6
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "PreviewImage"
+   },
+   "widgets_values": [],
+   "title": "Result",
+   "color": "#555",
+   "bgcolor": "#222"
+  }
+ ],
+ "links": [
+  [
+   1,
+   2,
+   0,
+   5,
+   0,
+   "IMAGE"
+  ],
+  [
+   2,
+   5,
+   0,
+   6,
+   1,
+   "MFLUX_IMAGE"
+  ],
+  [
+   3,
+   3,
+   0,
+   6,
+   0,
+   "IMAGE"
+  ],
+  [
+   4,
+   4,
+   0,
+   7,
+   0,
+   "MFLUX_MODEL"
+  ],
+  [
+   5,
+   6,
+   0,
+   7,
+   2,
+   "MFLUX_IMAGE"
+  ],
+  [
+   6,
+   7,
+   0,
+   8,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {},
+ "version": 0.4
+}

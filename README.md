@@ -54,6 +54,8 @@ Restart ComfyUI.
 | **mflux LoRA** | Chainable LoRA feeder (local file, HuggingFace repo, or `repo:filename.safetensors`). Stack several to compose. |
 | **mflux Image** | Typed image feeder: a primary image, an optional mask (native inpaint for fill, or the mask-preserve composite for edit models), and an optional depth/control map (for depth and controlnet models). Chain via `image_in` for multi-image edits. |
 | **mflux Auto Mask** | Segments a room photo (ADE20K SegFormer) and turns a named region (floor / walls / ceiling / windows / doors / furniture / custom) into a mask, for regional restyling without hand-painting. Runs locally on MPS. |
+| **mflux Depth Map** | Generates a depth map from a photo with DepthPro, natively in MLX, so a depth-guided workflow is self-contained (no external preprocessing). |
+| **mflux VLM** | Runs FIBO-vlm (Qwen3-VL) locally to turn a room photo and/or a brief into a prompt. Modes: `analyze` (describe the photo), `expand` (brief into a prompt), `renovate` (apply the brief to the photo). Outputs `(prompt, survey)`. |
 | **mflux Upscale (SeedVR2)** | One-step SeedVR2 upscaler. Loads its own model. |
 
 ## Supported models
@@ -75,6 +77,33 @@ A HuggingFace repo or local path can be typed into the loader's `model_path` to 
 a model that is not in the dropdown; it is dispatched to the right architecture by
 name, and rejected with a clear message if it is not a sampler model (for example a
 SeedVR2 upscaler).
+
+## Example workflows
+
+`example_workflows/` ships a set of small, openable workflows (drag one onto the
+ComfyUI canvas, or Workflow -> Open), one per capability, each with an in-canvas note
+that explains it. They default to fast, cached models where possible.
+
+| File | Shows |
+|---|---|
+| `01_txt2img.json` | Text to image with any model in the dropdown |
+| `02_img2img.json` | Image to image (`image` + `image_strength`) |
+| `03_lora.json` | Stack a LoRA (chainable) |
+| `04_edit_restyle.json` | Restyle a room and add furniture (edit model) |
+| `05_edit_replace_object.json` | Replace a specific object ("TV -> fireplace") |
+| `06_edit_region_mask.json` | Change only one region (auto-mask + inpaint) |
+| `07_controlnet_depth.json` | Depth ControlNet, depth map generated in-graph |
+| `08_multi_controlnet.json` | Stack depth + canny ControlNets |
+| `09_redux_moodboard.json` | Redux style transfer from reference photos |
+| `10_vlm_prompt.json` | FIBO-vlm writes a prompt from a brief/photo |
+| `11_upscale.json` | SeedVR2 upscale |
+| `INTERIOR_DESIGN_PRO.json` | Everything above wired into one interior tool |
+
+`INTERIOR_DESIGN_PRO.json` is the full board: three restyle paths (edit model, depth
+ControlNet, Redux), automatic depth and region analysis, an optional VLM prompt writer,
+live previews, and a before/after comparison. Turn one path on at a time with the
+Bypasser; start with **path B** (the edit model), which keeps your room and adds or
+replaces furniture. The generators that build these live in `tools/`.
 
 ## Interior design / renovation
 
