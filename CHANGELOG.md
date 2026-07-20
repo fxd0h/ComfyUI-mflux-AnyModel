@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.7.1]
+
+### Fixed
+- **A failed generation no longer kills ComfyUI's prompt worker.** When a node raises, ComfyUI
+  formats every input with `str()` to build the error report. `MfluxModelHandle` is a dataclass, so
+  its default `__repr__` printed the `instance` field, walking the entire MLX module tree; some MLX
+  layers have a broken `__repr__` (`Conv3d` reads a missing `groups`), so the recursion raised inside
+  the error handler and took down the worker thread. One failed run left the queue dead until the
+  server was restarted. The handle now has a shallow `__repr__` (alias + family).
+
+### Known issues
+- `krea-2-depth` and `qwen-image-edit` currently fail inside ComfyUI with
+  `RuntimeError: There is no Stream(gpu, 0) in current thread` raised from `mx.eval`. Both work in a
+  standalone process (main thread and worker thread), and threading, the DepthPro path,
+  `free_comfy_first` and memory pressure have each been ruled out by experiment. Under investigation.
+
 ## [0.7.0]
 
 ### Added
