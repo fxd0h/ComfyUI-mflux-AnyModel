@@ -58,6 +58,43 @@ Krea2 = _imp("mflux.models.krea2.variants.txt2img.krea2", "Krea2")
 Krea2Depth = _imp("mflux.models.krea2.variants.controlnet.krea2_depth", "Krea2Depth")
 BooguImage = _imp("mflux.models.boogu.variants.txt2img.boogu_image", "BooguImage")
 
+
+def _materialize_import_time_lazy_arrays():
+    """Unbind mflux's module-level lazy MLX arrays from the thread that imported us.
+
+    MLX >= 0.31 keeps a Metal command encoder per *thread* and pins an unevaluated array to the
+    stream of the thread that recorded it; evaluating it anywhere else raises
+    "There is no Stream(gpu, N) in current thread" (ml-explore/mlx#3529, still open on 0.32).
+
+    ComfyUI imports custom nodes on the main thread but runs every node on its single prompt_worker
+    thread, so any lazy array created at import time is born on the wrong thread. QwenVAE declares
+
+        LATENTS_MEAN = mx.array([...]).reshape(1, 16, 1, 1, 1)
+
+    and that trailing reshape records a primitive instead of materializing, so the constant stays
+    lazy. The first eval downstream of a QwenVAE encode/decode then dies. That is exactly why
+    `qwen-image-edit` and `krea-2-depth` failed inside ComfyUI while every other family worked:
+    Krea 2 reuses the Qwen VAE (krea2_initializer sets `model.vae = QwenVAE()`).
+
+    Evaluating the constants here, on the importing thread, materializes them so they carry no
+    stream affinity and can be used from any thread.
+    """
+    try:
+        import mlx.core as mx
+        from mflux.models.qwen.model.qwen_vae.qwen_vae import QwenVAE
+    except Exception:
+        return  # stock mflux without the Qwen VAE, or MLX missing: nothing to unbind
+    consts = [getattr(QwenVAE, name, None) for name in ("LATENTS_MEAN", "LATENTS_STD")]
+    consts = [c for c in consts if isinstance(c, mx.array)]
+    if consts:
+        try:
+            mx.eval(*consts)
+        except Exception:
+            pass  # never block node import over this
+
+
+_materialize_import_time_lazy_arrays()
+
 # Variant aliases that must dispatch to a dedicated class (a plain base-family
 # ladder would route all of these to Flux1 and silently ignore their image inputs).
 # Each entry verified against the CLI entrypoint that instantiates that class.

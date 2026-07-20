@@ -3,6 +3,27 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.7.2]
+
+### Fixed
+- **`krea-2-depth` and `qwen-image-edit` now run inside ComfyUI.** They failed with
+  `RuntimeError: There is no Stream(gpu, 0) in current thread` raised from `mx.eval`, and the same
+  failure took several minutes to surface. Root cause: MLX >= 0.31 keeps a Metal command encoder per
+  *thread* and pins an unevaluated array to the stream of the thread that recorded it
+  (ml-explore/mlx#3529). `QwenVAE` declares its latent constants as
+  `mx.array([...]).reshape(1, 16, 1, 1, 1)`, and the trailing `reshape` records a primitive instead
+  of materializing, so the constants stay lazy. ComfyUI imports custom nodes on the main thread but
+  runs every node on its single prompt_worker thread, so the first `mx.eval` downstream of a QwenVAE
+  encode/decode died. Only these two families were affected because Krea 2 reuses the Qwen VAE.
+  The dispatch module now materializes those constants on the importing thread. Verified end to end:
+  both models render (70s and 76s) with no stream error and no worker crash.
+
+### Added
+- Two more example workflows now that those models work: `12_qwen_edit.json` and
+  `13_krea2_depth.json` (the latter documents the local-checkpoint requirement, the
+  `image` vs `map_image` trap, and Krea-2-Turbo's 8 steps / guidance 1.0).
+
+
 ## [0.7.1]
 
 ### Fixed
@@ -14,10 +35,7 @@ based on Keep a Changelog.
   server was restarted. The handle now has a shallow `__repr__` (alias + family).
 
 ### Known issues
-- `krea-2-depth` and `qwen-image-edit` currently fail inside ComfyUI with
-  `RuntimeError: There is no Stream(gpu, 0) in current thread` raised from `mx.eval`. Both work in a
-  standalone process (main thread and worker thread), and threading, the DepthPro path,
-  `free_comfy_first` and memory pressure have each been ruled out by experiment. Under investigation.
+- `krea-2-depth` and `qwen-image-edit` fail inside ComfyUI with an MLX stream error. **Fixed in 0.7.2.**
 
 ## [0.7.0]
 

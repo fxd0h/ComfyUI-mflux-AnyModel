@@ -97,6 +97,8 @@ that explains it. They default to fast, cached models where possible.
 | `09_redux_moodboard.json` | Redux style transfer from reference photos |
 | `10_vlm_prompt.json` | FIBO-vlm writes a prompt from a brief/photo |
 | `11_upscale.json` | SeedVR2 upscale |
+| `12_qwen_edit.json` | Instruction edit with Qwen-Image-Edit (takes several references) |
+| `13_krea2_depth.json` | Krea 2 depth ControlNet: hold the 3D layout, keep the furniture |
 | `INTERIOR_DESIGN_PRO.json` | Everything above wired into one interior tool |
 
 `INTERIOR_DESIGN_PRO.json` is the full board: three restyle paths (edit model, depth
