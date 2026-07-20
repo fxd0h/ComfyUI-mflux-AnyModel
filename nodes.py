@@ -137,6 +137,14 @@ class MfluxModelHandle:
     free_comfy_first: bool = True
     lora_note: str = ""
 
+    def __repr__(self) -> str:
+        # Deliberately shallow. When a node raises, ComfyUI formats every input with str() to build
+        # the error report; the dataclass default __repr__ would print `instance`, recursing into the
+        # whole MLX module tree. Some MLX layers have a broken __repr__ (e.g. Conv3d reads a missing
+        # `groups`), so that recursion raises INSIDE the error handler and kills ComfyUI's prompt
+        # worker thread — turning one failed generation into a dead queue that needs a restart.
+        return f"MfluxModelHandle(alias={self.alias!r}, family={self.family!r})"
+
 
 @dataclass
 class MfluxImagePayload:

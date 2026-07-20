@@ -278,8 +278,28 @@ It is its own model, loaded separately. Point it at any image.""", (1040, 170), 
     save(w, "11_upscale.json", "seedvr2-3b")
 
 
+def ex_qwen_edit():
+    w = WF()
+    w.note((20, 20), """# 12 · Instruction edit with Qwen-Image-Edit
+
+A second edit model alongside FLUX.2-klein-edit, with a different look. Same idea: give it your photo
+and an instruction ("replace the floor with dark walnut, add a grey sofa, keep the room and the windows").
+
+It takes a LIST of reference images, so you can chain **mflux Image** nodes through `image_in` to feed
+several references at once. It also accepts a `negative_prompt`, which klein-edit does not.""", (1120, 210), title="12 · Qwen edit")
+    img = w.add("LoadImage", col(0), {"image": "room.png"}, "Your room", color=(BLUE, "#233"), size=[340, 300])
+    ld = w.add("MfluxModelLoader", col(1), {"model": "qwen-image-edit", "quantize": "8"}, "Loader · qwen-image-edit", color=(GREEN, "#232"), size=[340, 260])
+    mi = w.add("MfluxImage", col(2), {}, "Photo (chain image_in for more)", color=(GREEN, "#232"), size=[340, 130])
+    s = w.add("MfluxModelSampler", col(3), {"prompt": ("Replace the floor with dark walnut wood and add a grey three-seat sofa. "
+              "Keep the room, the windows, the TV and the viewpoint the same."),
+              "seed": 3, "width": 1024, "height": 768, "mask_mode": "off"}, "Sampler · your instruction", color=(GREEN, "#232"), size=[340, 440])
+    pv = w.add("PreviewImage", col(4), {}, "Result", color=(GREY, "#222"), size=[340, 300])
+    w.link(img, 0, mi, "image"); w.link(ld, 0, s, "model"); w.link(mi, 0, s, "mflux_image"); w.link(s, 0, pv, "images")
+    save(w, "12_qwen_edit.json", "qwen-image-edit")
+
+
 print("Building example library ->", OUTDIR)
 for fn in (ex_txt2img, ex_img2img, ex_lora, ex_edit_restyle, ex_replace_object, ex_region_mask,
-           ex_controlnet_depth, ex_multi_controlnet, ex_redux, ex_vlm, ex_upscale):
+           ex_controlnet_depth, ex_multi_controlnet, ex_redux, ex_vlm, ex_upscale, ex_qwen_edit):
     fn()
 print("done.")
