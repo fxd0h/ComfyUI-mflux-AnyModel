@@ -1,0 +1,5 @@
+# Dev-only, never needed at runtime. Keeping them out of the published package
+# also keeps the localhost object_info calls in tools/ out of the shipped zip.
+tools/
+tests/
+node.zip

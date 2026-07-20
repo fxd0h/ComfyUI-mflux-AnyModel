@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.7.3]
+
+### Changed
+- **Ship only what runs.** Added `.comfyignore` so `tools/` (the workflow generators) and `tests/`
+  stay out of the published package. They are dev-only, and the generators call
+  `urllib.request.urlopen("http://127.0.0.1:8188/object_info")`, which has no business being in a
+  distributed node. Package drops from 96 KB to 68 KB.
+
+
 ## [0.7.2]
 
 ### Fixed
