@@ -298,8 +298,44 @@ several references at once. It also accepts a `negative_prompt`, which klein-edi
     save(w, "12_qwen_edit.json", "qwen-image-edit")
 
 
+def ex_krea2_depth():
+    w = WF()
+    w.note((20, 20), """# 13 · Krea 2 depth ControlNet
+
+Restyles a room while holding its 3D layout, and unlike the FLUX depth path it keeps and adds
+furniture rather than emptying the room. DepthPro derives the depth from your photo automatically,
+so no depth node is needed: wire the photo to **image** (NOT `map_image`).
+
+**Setup:** `controlnet_path` needs a LOCAL FILE, not an HF repo id. Download
+`depth-control-lora.safetensors` (862 MB) from **Patil/Krea-2-depth-controlnet** and put its path in.
+
+**Things that silently go wrong:**
+- Photo into `map_image` = garbage. That socket means "already-computed depth map" and always wins
+  over the photo, so DepthPro never runs to correct it.
+- `width`/`height` must match YOUR photo's aspect (landscape 1024x768). The image is resized with no
+  crop, so a square output on a landscape photo stretches the room.
+- The alias always loads Krea-2-**Turbo**: keep `guidance` at 1.0 (it is distilled for no CFG, and at
+  exactly 1.0 `negative_prompt` is inert) and `steps` at 8. Leaving both at 0 gives the same defaults.
+- `mflux Image`'s `strength` is a no-op here. Control strength lives on the loader's
+  `controlnet_strength`, and changing it evicts the cache and forces a full ~33 GB reload.""",
+           (1200, 330), title="13 · Krea 2 depth")
+    img = w.add("LoadImage", (NX0 + 0*DX, 400), {"image": "room.png"}, "Your room", color=(BLUE, "#233"), size=[340, 300])
+    ld = w.add("MfluxModelLoader", (NX0 + 1*DX, 400), {
+        "model": "krea-2-depth", "quantize": "8",
+        "controlnet_path": "/absolute/path/to/depth-control-lora.safetensors",
+        "controlnet_strength": 1.0,
+    }, "Loader · krea-2-depth (set the path)", color=(RED, "#322"), size=[340, 280])
+    mi = w.add("MfluxImage", (NX0 + 2*DX, 400), {}, "Photo -> image (not map_image)", color=(RED, "#322"), size=[340, 130])
+    s = w.add("MfluxModelSampler", (NX0 + 3*DX, 400), {"prompt": "a warm modern living room, dark walnut floor, cream walls, soft daylight, photorealistic interior",
+              "seed": 42, "steps": 8, "guidance": 1.0, "width": 1024, "height": 768}, "Sampler · 8 steps, guidance 1.0", color=(RED, "#322"), size=[340, 440])
+    pv = w.add("PreviewImage", (NX0 + 4*DX, 400), {}, "Result", color=(GREY, "#222"), size=[340, 300])
+    w.link(img, 0, mi, "image"); w.link(ld, 0, s, "model"); w.link(mi, 0, s, "mflux_image"); w.link(s, 0, pv, "images")
+    save(w, "13_krea2_depth.json", "krea-2-depth")
+
+
 print("Building example library ->", OUTDIR)
 for fn in (ex_txt2img, ex_img2img, ex_lora, ex_edit_restyle, ex_replace_object, ex_region_mask,
-           ex_controlnet_depth, ex_multi_controlnet, ex_redux, ex_vlm, ex_upscale, ex_qwen_edit):
+           ex_controlnet_depth, ex_multi_controlnet, ex_redux, ex_vlm, ex_upscale, ex_qwen_edit,
+           ex_krea2_depth):
     fn()
 print("done.")
