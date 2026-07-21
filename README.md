@@ -52,6 +52,22 @@ ComfyUI/.venv/bin/pip install "mflux>=0.18.0"
 
 Restart ComfyUI.
 
+### Running on mflux-CV instead
+
+[mflux-CV](https://github.com/HowDidTheCatGetSoFat/mflux-cv) is a community build of mflux kept
+rebased on upstream `main`, carrying curated fixes and community PRs ahead of an upstream release.
+The node detects whichever one is installed, so this is optional, and it is what the multi-ControlNet
+stacking described below requires (>= 0.18.25).
+
+```
+ComfyUI/.venv/bin/pip uninstall -y mflux
+ComfyUI/.venv/bin/pip install "mflux-cv>=0.18.25"
+```
+
+The uninstall matters. Both distributions provide the same `mflux` import package, pip reports no
+conflict when both are present, and they overwrite each other's files. Keep exactly one installed,
+and reverse the two commands to go back to upstream.
+
 ## Nodes
 
 | Node | Purpose |
