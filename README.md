@@ -13,6 +13,13 @@ model actually accepts. Parameters a model ignores are dropped with a note inste
 of silently corrupting the result, and an input image is never handed to a model
 that cannot use it.
 
+It behaves like a native ComfyUI node while it runs: the image **streams into the node
+as it denoises**, the progress bar advances, and **Cancel works mid-generation**. Two
+input nodes cover the common preprocessing so a graph stays self-contained: **mflux
+Depth Map** derives a depth map with DepthPro, and **mflux VLM** runs FIBO-vlm locally
+to turn a photo and a brief into a prompt. `example_workflows/` ships **13 openable
+workflows**, one per capability, each with an in-canvas note.
+
 ## Why this exists
 
 Most mflux models are driven the same way, but not all. Ideogram 4 is preset-driven:
@@ -50,7 +57,7 @@ Restart ComfyUI.
 | Node | Purpose |
 |------|---------|
 | **mflux Model Loader** | Resolve a model (builtin alias, HuggingFace repo, or local path) with quantization and an optional LoRA chain. Outputs a typed `MFLUX_MODEL` handle that carries the model and its capability profile. |
-| **mflux Sampler** | Generate from the handle. Reads the capability profile and forwards only valid parameters. Outputs the image and an `info` string listing what was forwarded or dropped. |
+| **mflux Sampler** | Generate from the handle. Reads the capability profile and forwards only valid parameters. Streams the image into the node as it denoises, drives the progress bar, and lets Cancel stop a run mid-generation (`live_preview`, `preview_stride`). Outputs the image and an `info` string listing what was forwarded or dropped. |
 | **mflux LoRA** | Chainable LoRA feeder (local file, HuggingFace repo, or `repo:filename.safetensors`). Stack several to compose. |
 | **mflux Image** | Typed image feeder: a primary image, an optional mask (native inpaint for fill, or the mask-preserve composite for edit models), and an optional depth/control map (for depth and controlnet models). Chain via `image_in` for multi-image edits. |
 | **mflux Auto Mask** | Segments a room photo (ADE20K SegFormer) and turns a named region (floor / walls / ceiling / windows / doors / furniture / custom) into a mask, for regional restyling without hand-painting. Runs locally on MPS. |
