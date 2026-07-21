@@ -74,4 +74,77 @@ cb = P.ComfyLivePreview(type("M", (), {"vae": None})(), latent_creator=None)
 check("decode with no latent_creator is guarded upstream (returns None on error)",
       cb._decode(object(), type("C", (), {"height": 512, "width": 512})()) is None)
 
+print("decode path selection (the Ideogram 4 trap)")
+
+
+class FakeVAE:
+    """Mimics Flux2VAE: HAS decode_packed_latents, declares 32 latent channels."""
+    latent_channels = 32
+
+    def __init__(self):
+        self.calls = []
+
+    def decode_packed_latents(self, x):
+        self.calls.append("packed"); return _img()
+
+    def decode(self, x):
+        self.calls.append("plain"); return _img()
+
+
+class FakeCreator:
+    out = None
+
+    @classmethod
+    def unpack_latents(cls, latents, height, width):
+        return cls.out
+
+
+def _img():
+    """Image-shaped decoder output, so _decode completes through the PIL conversion."""
+    import mlx.core as mx
+    return mx.zeros((1, 3, 8, 8))
+
+
+def Arr(ch):
+    """A real array, so _decode runs to completion instead of dying after the branch."""
+    import mlx.core as mx
+    return mx.zeros((1, ch, 8, 8))
+
+
+def path_for(channels):
+    vae = FakeVAE()
+    FakeCreator.out = Arr(channels)
+    cb = P.ComfyLivePreview(type("M", (), {"vae": vae})(), FakeCreator)
+    cb._decode(object(), type("C", (), {"height": 512, "width": 512})())
+    return vae.calls[0] if vae.calls else "none"
+
+
+# FLUX.2: unpack_latents leaves 128 patchified channels -> needs decode_packed_latents
+check("128ch (FLUX.2, still patchified) -> decode_packed_latents", path_for(128) == "packed")
+# Ideogram 4: unpack_latents already applied shift/scale and unpatchified -> plain decode
+check("32ch (Ideogram 4, VAE-ready) -> plain decode", path_for(32) == "plain")
+check("below latent_channels also uses plain decode", path_for(16) == "plain")
+
+
+class NoPackedVAE:
+    latent_channels = 16
+
+    def __init__(self):
+        self.calls = []
+
+    def decode(self, x):
+        self.calls.append("plain"); return _img()
+
+
+def path_no_packed(channels):
+    vae = NoPackedVAE()
+    FakeCreator.out = Arr(channels)
+    cb = P.ComfyLivePreview(type("M", (), {"vae": vae})(), FakeCreator)
+    cb._decode(object(), type("C", (), {"height": 512, "width": 512})())
+    return vae.calls[0] if vae.calls else "none"
+
+
+check("a VAE without decode_packed_latents is unaffected", path_no_packed(128) == "plain")
+
+
 print("\nPREVIEW OK — resolver + registry hygiene + decode safety verified")
