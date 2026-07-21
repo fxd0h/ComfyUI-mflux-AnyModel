@@ -80,8 +80,20 @@ class ComfyLivePreview:
                 latents=latents, height=config.height, width=config.width
             )
             vae = self.model.vae
-            decoded = (vae.decode_packed_latents(unpacked)
-                       if hasattr(vae, "decode_packed_latents") else vae.decode(unpacked))
+            # Do NOT pick the decode path by `hasattr(vae, "decode_packed_latents")` alone: Ideogram 4
+            # uses Flux2VAE, so it always has that method. What differs is what unpack_latents left us.
+            # FLUX.2 hands back patchified latents (128ch) that still need the BN denorm + unpatchify
+            # decode_packed_latents does; Ideogram 4 applies its own shift/scale and unpatchifies inside
+            # unpack_latents, so its latents are already VAE-ready (32ch).
+            #
+            # mflux-CV is not affected: its Flux2VAE.decode_packed_latents falls through to decode()
+            # when the channel count does not match the BN, so Ideogram 4 previews render correctly
+            # (verified end to end). This guard is for **stock mflux from PyPI**, which ships Ideogram 4
+            # without that fall-through, and which this node also has to run on.
+            # Same bug, fixed one layer down here: filipstrand/mflux#444 (@plz12345) and our #468.
+            latent_channels = getattr(vae, "latent_channels", 32)
+            packed = hasattr(vae, "decode_packed_latents") and unpacked.shape[1] > latent_channels
+            decoded = vae.decode_packed_latents(unpacked) if packed else vae.decode(unpacked)
             pil = ImageUtil._numpy_to_pil(ImageUtil._to_numpy(ImageUtil._denormalize(decoded)))
             return ("JPEG", pil.convert("RGB"), self.max_size)
         except Exception as e:

@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.7.4]
+
+### Fixed
+- **Live preview on Ideogram 4 when running against stock mflux.** The preview decoder chose its path
+  with `hasattr(vae, "decode_packed_latents")`, which does not discriminate: Ideogram 4 uses
+  `Flux2VAE`, so it always has that method. What differs is what `unpack_latents` returns. FLUX.2
+  hands back patchified latents (128 channels) that still need the BN denorm and unpatchify that
+  `decode_packed_latents` performs, while Ideogram 4 applies its own shift/scale and unpatchifies
+  inside `unpack_latents`, so its latents are already VAE-ready (32 channels). The path is now chosen
+  by channel count. mflux-CV was never affected, because its `decode_packed_latents` falls through to
+  `decode()` on a channel mismatch, but stock mflux from PyPI ships Ideogram 4 without that
+  fall-through and this node runs there too. Same bug one layer down: filipstrand/mflux#444 (@plz12345)
+  and our #468.
+
+
 ## [0.7.3]
 
 ### Changed
