@@ -60,7 +60,7 @@ def requirements(model):
     import mflux_dispatch as D
     cls, family = D.pick_model_class(model, None)
     if cls is None:
-        return False, False
+        return None, None  # unknown to this build; caller skips rather than guessing a graph
     profile = C.build_profile(cls, family)
     roles = getattr(profile, "image_role_args", {}) or {}
     needs_image = any(v == "req" for v in roles.values()) or family in getattr(D, "NEEDS_ANY_IMAGE", set())
@@ -73,19 +73,41 @@ def submit(server, graph):
     req = urllib.request.Request(server + "/prompt", body, {"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
-            return json.load(r)["prompt_id"], None
+            payload = json.load(r)
     except urllib.error.HTTPError as e:
         try:
-            payload = json.loads(e.read().decode())
-            msgs = [x.get("message", "") for n in payload.get("node_errors", {}).values()
+            body = json.loads(e.read().decode())
+            msgs = [x.get("message", "") for n in body.get("node_errors", {}).values()
                     for x in n.get("errors", [])]
-            return None, "; ".join(msgs) or payload.get("error", {}).get("message", str(e))
+            return None, "; ".join(msgs) or body.get("error", {}).get("message", str(e))
         except Exception:
             return None, f"HTTP {e.code}"
+    except Exception as e:
+        # connection refused, DNS, read timeout, malformed JSON: one model's problem, not the run's
+        return None, f"{type(e).__name__}: {e}"[:120]
+    prompt_id = payload.get("prompt_id")
+    if not prompt_id:
+        return None, f"server accepted the prompt but returned no prompt_id: {str(payload)[:80]}"
+    return prompt_id, None
+
+
+def cancel(server, prompt_id):
+    """Drop a timed-out prompt. Left running it would still hold the GPU for the next model."""
+    for path, body in (("/queue", {"delete": [prompt_id]}), ("/interrupt", {})):
+        try:
+            req = urllib.request.Request(server + path, json.dumps(body).encode(),
+                                         {"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=15).read()
+        except Exception:
+            pass
 
 
 def run_one(server, model, timeout, image_name):
+    if timeout <= 0:
+        raise ValueError(f"--timeout must be positive, got {timeout}")
     needs_image, needs_cn = requirements(model)
+    if needs_image is None:
+        return "SKIPPED", "this build does not resolve the alias to a model class", 0.0
     if needs_cn:
         return "SKIPPED", "needs a controlnet_path checkpoint this audit cannot guess", 0.0
     graph = {
@@ -123,7 +145,8 @@ def run_one(server, model, timeout, image_name):
                     detail = str(errors[0])[:120]
             return status.get("status_str", "?"), detail, time.time() - started
         time.sleep(5)
-    return "TIMEOUT", f">{timeout}s", time.time() - started
+    cancel(server, prompt_id)
+    return "TIMEOUT", f">{timeout}s (cancelled)", time.time() - started
 
 
 def main():
@@ -152,9 +175,15 @@ def main():
         pool = models if args.all else [m for m in models if looks_local(m)]
         targets = [m for m in pool if any(w in m.lower() for w in wanted)]
 
-    skipped = len(models) - len(targets)
+    would_download = 0 if args.all else sum(1 for m in models if not looks_local(m))
+    excluded_by_filter = len(models) - len(targets) - would_download
+    note = []
+    if would_download:
+        note.append(f"{would_download} would download (use --all)")
+    if excluded_by_filter > 0:
+        note.append(f"{excluded_by_filter} not matched by --only")
     print(f"{len(models)} models in the dropdown, auditing {len(targets)}"
-          + (f", skipping {skipped} that would download (use --all)" if skipped and not args.all else ""))
+          + (", skipping " + " and ".join(note) if note else ""))
     print()
 
     results = []
