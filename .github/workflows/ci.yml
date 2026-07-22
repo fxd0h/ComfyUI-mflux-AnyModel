@@ -17,7 +17,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install mflux-CV fork
-        run: pip install "mflux @ git+https://github.com/HowDidTheCatGetSoFat/mflux-cv.git@main"
+        # The fork's distribution is named `mflux-cv` (it still imports as `mflux`), so the
+        # PEP 508 name in the direct reference has to be mflux-cv, not mflux.
+        run: pip install "mflux-cv @ git+https://github.com/HowDidTheCatGetSoFat/mflux-cv.git@main"
       - name: Dispatch + capability self-tests
         run: python tests/test_dispatch.py
       - name: Sampler self-tests
