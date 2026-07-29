@@ -57,6 +57,16 @@ ErnieImage = _imp("mflux.models.ernie_image.variants.txt2img.ernie_image", "Erni
 Krea2 = _imp("mflux.models.krea2.variants.txt2img.krea2", "Krea2")
 Krea2Depth = _imp("mflux.models.krea2.variants.controlnet.krea2_depth", "Krea2Depth")
 BooguImage = _imp("mflux.models.boogu.variants.txt2img.boogu_image", "BooguImage")
+MageFlow = _imp("mflux.models.mage_flow.variants.txt2img.mage_flow", "MageFlow")
+MageFlowEdit = _imp("mflux.models.mage_flow.variants.edit.mage_flow_edit", "MageFlowEdit")
+# Z-Image Union ControlNet. Its generate_image takes `controls: list[ControlSpec]` rather than an
+# image path, so the role is special-cased (see inject_image in nodes.py). ControlType/ControlSpec
+# are imported here so the sampler can build the specs without importing mflux internals itself.
+# Note its return annotation says `-> Image.Image` but it actually hands back a GeneratedImage;
+# the sampler reads `.image` when present instead of trusting either.
+ZImageTurboControlnet = _imp("mflux.models.z_image.variants.controlnet.z_image_turbo_controlnet", "ZImageTurboControlnet")
+ControlSpec = _imp("mflux.models.z_image.variants.controlnet.control_types", "ControlSpec")
+ControlType = _imp("mflux.models.z_image.variants.controlnet.control_types", "ControlType")
 
 
 def _materialize_import_time_lazy_arrays():
@@ -114,6 +124,11 @@ _ALIAS_DISPATCH_RAW = {
     # "krea-2" still lands on txt2img Krea2.
     "krea-2-depth":             (Krea2Depth,         "krea2-depth"),     # krea2_depth_generate.py
     "krea2-depth":              (Krea2Depth,         "krea2-depth"),     # krea2_depth_generate.py (spelling alias)
+    # Z-Image Union ControlNet (z_image_turbo_generate_controlnet.py). Explicit aliases only, so a
+    # plain "z-image-turbo" still lands on txt2img ZImage. One control image per MfluxImage in the
+    # chain; the type of each comes from the sampler's control_type widget.
+    "z-image-controlnet":       (ZImageTurboControlnet, "z-image-controlnet"),
+    "z-image-turbo-controlnet": (ZImageTurboControlnet, "z-image-controlnet"),
 }
 # Drop entries whose class is absent from the installed mflux (upstream lacks fork-only variants).
 ALIAS_DISPATCH = {k: v for k, v in _ALIAS_DISPATCH_RAW.items() if v[0] is not None}
@@ -127,7 +142,7 @@ SEEDVR2_ALIASES = {"seedvr2", "seedvr2-3b", "seedvr2-7b", "seedvr2-7B"}
 NON_SAMPLER_ALIASES = {"qwen-image-layered", "qwen-layered"}
 
 # Base txt2img families the sampler drives end-to-end (seed/prompt, optional img2img).
-BASE_FAMILIES = {"flux", "qwen", "z-image", "ideogram4", "fibo", "ernie", "flux2", "krea2", "boogu"}
+BASE_FAMILIES = {"flux", "qwen", "z-image", "ideogram4", "fibo", "ernie", "flux2", "krea2", "boogu", "mage-flow"}
 
 # Variant/edit families the sampler drives via the typed MfluxImage feeder (primary +
 # optional mask + optional depth/control map + multi-image). catvton and the in-context
@@ -137,6 +152,11 @@ BASE_FAMILIES = {"flux", "qwen", "z-image", "ideogram4", "fibo", "ernie", "flux2
 WIRED_VARIANT_FAMILIES = {
     "flux-kontext", "flux-fill", "flux-depth", "flux-redux", "flux-controlnet",
     "qwen-edit", "fibo-edit", "flux2-edit", "krea2-depth",
+    # Mage Flow's instruction edit takes image_paths, the same list role qwen-edit/flux2-edit use.
+    "mage-flow-edit",
+    # Z-Image Union ControlNet: control images arrive through the same MfluxImage chain, and are
+    # turned into ControlSpecs rather than paths.
+    "z-image-controlnet",
 }
 # Edit/variant aliases that are valid models but not present in ui.MODEL_CHOICES.
 # (krea-2-depth / krea2-depth come from ALIAS_DISPATCH and already surface in the dropdown.)
@@ -148,6 +168,12 @@ if Flux2KleinEdit is not None:
     DROPDOWN_EXTRA.append("flux2-klein-edit")
 if Krea2 is not None:
     DROPDOWN_EXTRA += ["krea-2", "krea-2-raw"]
+if MageFlow is not None:
+    DROPDOWN_EXTRA += ["mage-flow", "mage-flow-turbo", "mage-flow-base"]
+if MageFlowEdit is not None:
+    DROPDOWN_EXTRA += ["mage-flow-edit", "mage-flow-edit-turbo"]
+if ZImageTurboControlnet is not None:
+    DROPDOWN_EXTRA.append("z-image-controlnet")
 
 # Families whose image roles are all optional in generate_image but that still need at least
 # one image source at run time (krea2-depth: DepthPro needs a photo, unless a depth map is given).
@@ -167,6 +193,14 @@ def pick_base_class(model: str, base_model: str = ""):
         return Krea2, "krea2"
     if BooguImage is not None and "boogu" in m:
         return BooguImage, "boogu"
+    # Mage Flow before the generic ladder; edit before txt2img so "mage-flow-edit-turbo" does not
+    # land on the txt2img class and silently drop its reference images.
+    if (MageFlow is not None or MageFlowEdit is not None) and ("mage-flow" in m or "mageflow" in m):
+        if "edit" in m and MageFlowEdit is not None:
+            return MageFlowEdit, "mage-flow-edit"
+        if MageFlow is not None:
+            return MageFlow, "mage-flow"
+        return MageFlowEdit, "mage-flow-edit"
     if QwenImageEdit is not None and "qwen" in m and "edit" in m:
         return QwenImageEdit, "qwen-edit"
     if QwenImage is not None and "qwen" in m:
@@ -217,6 +251,11 @@ def resolve_config_and_path(model: str, base_model: str = "", model_path: str = 
         # Default the base to FLUX.1-dev (an explicit model_path still wins via the guard above).
         cfg = ModelConfig.from_name(model, base_model=base_model or None)
         return cls, family, cfg, "black-forest-labs/FLUX.1-dev"
+    if ZImageTurboControlnet is not None and cls is ZImageTurboControlnet:
+        # Same shape as krea2-depth: not a ModelConfig alias, so from_name would fail. The class
+        # defaults model_config to the Union 2.1 controlnet config; an explicit model_path still wins.
+        cfg = ModelConfig.z_image_turbo_controlnet_union_2_1()
+        return cls, family, cfg, (model_path or None)
     if cls is Krea2Depth:
         # krea2-depth is not a ModelConfig alias (from_name would fail); it always runs on the
         # base Krea 2 config, same as the CLI. The depth-control checkpoint arrives via controlnet_path.

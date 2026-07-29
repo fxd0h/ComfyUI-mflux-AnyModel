@@ -27,6 +27,10 @@ NEGATIVE_INERT = {"flux"}
 IMAGE_ROLE_PARAMS = {
     "image_path", "masked_image_path", "depth_image_path", "redux_image_paths",
     "controlnet_image_path", "image_paths", "left_image_path", "right_image_path",
+    # Z-Image Union ControlNet takes ControlSpec objects rather than paths, but it is still an
+    # image role: without it the sampler would read `controls` as an unsatisfiable required arg
+    # and refuse to drive the model at all.
+    "controls",
 }
 
 

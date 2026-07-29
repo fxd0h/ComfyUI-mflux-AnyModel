@@ -259,6 +259,29 @@ def inject_image(profile, out, paths, gen):
     {primary, mask, aux, strength}. Driven by profile.image_role_args, so each
     family gets exactly the args its generate_image declares."""
     primaries = list(paths.get("primaries") or [paths["primary"]])
+    if "controls" in profile.image_role_args:
+        # Z-Image Union ControlNet: one ControlSpec per image in the MfluxImage chain, typed by the
+        # sampler's control_type widget. A single type applies to every image; a comma-separated list
+        # ("canny,depth") pairs with the chain in order, which is how a stack is built. Strengths come
+        # from the chain the same way a stacked FLUX controlnet gets one per net.
+        types = [t.strip().lower() for t in str(paths.get("control_type") or "canny").split(",") if t.strip()]
+        if len(types) == 1:
+            types = types * len(primaries)
+        if len(types) != len(primaries):
+            raise ValueError(
+                f"control_type has {len(types)} entries but {len(primaries)} control image(s) are "
+                f"connected. Give one type, or one per image in chain order."
+            )
+        valid = {t.value for t in D.ControlType}
+        bad = [t for t in types if t not in valid]
+        if bad:
+            raise ValueError(f"unknown control type(s) {bad}; valid: {sorted(valid)}")
+        per_image = paths.get("strengths") or [paths.get("strength") or 1.0] * len(primaries)
+        out["controls"] = [
+            D.ControlSpec(type=D.ControlType(t), image_path=p, strength=float(s))
+            for t, p, s in zip(types, primaries, per_image)
+        ]
+        return
     for arg, req in profile.image_role_args.items():
         if arg in PRIMARY_SCALAR:
             # A stack of controlnets takes one control image each, in the order of the MfluxImage
@@ -577,6 +600,7 @@ class MfluxModelSampler:
                 "image": ("IMAGE", {"tooltip": "Quick img2img on base models. For variants (fill/depth/controlnet) use MfluxImage."}),
                 "image_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "mflux_image": ("MFLUX_IMAGE",),
+                "control_type": ("STRING", {"default": "canny", "tooltip": "z-image-controlnet only. What each connected control image is: canny, depth, hed, mlsd or pose. One value applies to every image; a comma-separated list ('canny,depth') pairs with the MfluxImage chain in order, which is how you stack controls. Ignored by every other model."}),
                 "mask_mode": (["preserve", "inpaint", "off"], {"default": "preserve", "tooltip": "How to use a mask connected on MfluxImage for edit/img2img models that don't inpaint natively (FLUX.2-edit, qwen-edit, krea2, img2img). preserve: painted (white) areas stay pixel-identical to the original — lock windows/doors. inpaint: only painted (white) areas take the edit. off: ignore. (flux-fill uses its mask natively; this does not apply.)"}),
                 "mask_feather": ("INT", {"default": 4, "min": 0, "max": 200, "tooltip": "Gaussian feather (px) on the mask edge for a seamless composite."}),
                 "live_preview": ("BOOLEAN", {"default": True, "tooltip": "Stream the image as it denoises into the node, and drive the progress bar. Also enables the Cancel button mid-generation. Costs one VAE decode per shown step."}),
@@ -593,7 +617,7 @@ class MfluxModelSampler:
     def generate(self, model, prompt, params_mode, negative_prompt="", seed=0,
                  steps=0, guidance=0.0, width=1024, height=1024, scheduler="auto",
                  preset="(model default)", strict_caption_validation=False,
-                 image=None, image_strength=0.6, mflux_image=None,
+                 image=None, image_strength=0.6, mflux_image=None, control_type="canny",
                  mask_mode="preserve", mask_feather=4,
                  live_preview=True, preview_stride=2, unique_id=None):
         handle = model
@@ -628,6 +652,7 @@ class MfluxModelSampler:
                     "aux": materialize(payload.aux) if payload.aux is not None else None,
                     "strength": scalar_s,
                     "strengths": [float(s) for s in per_image],
+                    "control_type": control_type,   # only read by the z-image-controlnet role
                 }
             requested = {
                 "seed": int(seed), "prompt": prompt, "negative_prompt": negative_prompt,
@@ -656,16 +681,21 @@ class MfluxModelSampler:
             notes = [handle.lora_note] + notes
         info = f"model={handle.alias} family={handle.family} forwarded={sorted(forwarded)}"
 
+        # Families return a GeneratedImage (metadata + .image), except where they do not: the
+        # Z-Image ControlNet is annotated `-> Image.Image` and in fact returns a GeneratedImage.
+        # Read whichever actually came back rather than trusting the annotation either way.
+        gen_pil = getattr(gen, "image", gen)
+
         # Mask-preserve composite: for edit/img2img models that do NOT consume a mask natively,
         # a connected mask lets painted regions stay locked to the original (hard-lock openings)
         # or restrict the edit to the painted region. flux-fill consumes its mask natively -> skip.
-        out_image = _pil_to_image(gen.image)
+        out_image = _pil_to_image(gen_pil)
         native_mask = bool(set(handle.profile.image_role_args) & MASK_ARGS)
         if (payload is not None and payload.mask is not None and not native_mask
                 and mask_mode != "off" and payload.images):
             try:
                 out_image = _preserve_composite(
-                    original_tensor=payload.images[0], edited_pil=gen.image,
+                    original_tensor=payload.images[0], edited_pil=gen_pil,
                     mask_tensor=payload.mask, keep_white=(mask_mode == "preserve"),
                     feather=int(mask_feather),
                 )

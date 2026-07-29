@@ -34,7 +34,7 @@ def ok(cond, msg):
 
 # ---- 1. dispatch: no variant alias silently degrades to a base txt2img class ----
 _BASE_TXT2IMG = {Flux1, FIBO}  # the classes a flux-/fibo- variant would wrongly fall back to
-_VARIANT_FAMILY_PREFIXES = ("flux-", "fibo-", "krea2-")
+_VARIANT_FAMILY_PREFIXES = ("flux-", "fibo-", "krea2-", "z-image-controlnet")
 for alias in D.ALIAS_DISPATCH:
     cls, family = D.pick_model_class(alias)
     ok(cls not in _BASE_TXT2IMG, f"{alias} degraded to a base txt2img class (trap reintroduced)")
