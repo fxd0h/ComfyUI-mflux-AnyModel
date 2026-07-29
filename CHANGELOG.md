@@ -3,6 +3,42 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.8.1]
+
+### Fixed
+- **`control_type` was inserted in the middle of the sampler's inputs in 0.8.0, which shifts every
+  widget in already-saved graphs.** ComfyUI stores `widgets_values` positionally, so a workflow saved
+  before 0.8.0 would have read `mask_mode` into `control_type`, `mask_feather` into `mask_mode`, and
+  so on down the line, with nothing raised to say so. The widget is now appended last, where a new
+  entry leaves every existing position alone. 0.8.0 reached the registry with this in it; upgrade
+  past it rather than pinning to it.
+
+### Added
+- Two example workflows for the families 0.8.0 wired: `14_zimage_controlnet.json` and
+  `15_mage_flow.json`, each with the traps written into the note node (feed the original photo rather
+  than a pre-computed edge map, how a `canny,depth` stack pairs with the MfluxImage chain, and which
+  aliases are distilled).
+
+## [0.8.0]
+
+### Added
+- **Mage Flow**, text-to-image and instruction edit (`mage-flow`, `mage-flow-turbo`, `mage-flow-base`,
+  `mage-flow-edit`, `mage-flow-edit-turbo`). The edit variant takes `image_paths`, the same list role
+  qwen-edit and flux2-edit already use, so it rides the existing MfluxImage feeder. Edit is matched
+  before txt2img in the ladder so `mage-flow-edit-turbo` cannot land on the txt2img class and silently
+  drop its references.
+- **Z-Image Union ControlNet** (`z-image-controlnet`), the only Z-Image ControlNet in MLX, previously
+  reachable only from the CLI. Its `generate_image` takes `controls: list[ControlSpec]` rather than an
+  image path, so `controls` joins `IMAGE_ROLE_PARAMS` (without that the profile reads an unsatisfiable
+  required argument and the sampler refuses the model outright), and `inject_image` builds one spec per
+  image in the MfluxImage chain. A `control_type` widget names them: one value applies to every image,
+  a comma-separated list pairs with the chain in order. Per-control strengths come from the chain.
+
+### Fixed
+- The sampler read `gen.image` unconditionally. `ZImageTurboControlnet` is annotated `-> Image.Image`
+  and in fact returns a `GeneratedImage`, so the output is now read from `.image` when it is present
+  rather than trusting either the annotation or the wrapper.
+
 ## [0.7.4]
 
 ### Fixed

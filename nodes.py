@@ -600,11 +600,15 @@ class MfluxModelSampler:
                 "image": ("IMAGE", {"tooltip": "Quick img2img on base models. For variants (fill/depth/controlnet) use MfluxImage."}),
                 "image_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "mflux_image": ("MFLUX_IMAGE",),
-                "control_type": ("STRING", {"default": "canny", "tooltip": "z-image-controlnet only. What each connected control image is: canny, depth, hed, mlsd or pose. One value applies to every image; a comma-separated list ('canny,depth') pairs with the MfluxImage chain in order, which is how you stack controls. Ignored by every other model."}),
                 "mask_mode": (["preserve", "inpaint", "off"], {"default": "preserve", "tooltip": "How to use a mask connected on MfluxImage for edit/img2img models that don't inpaint natively (FLUX.2-edit, qwen-edit, krea2, img2img). preserve: painted (white) areas stay pixel-identical to the original — lock windows/doors. inpaint: only painted (white) areas take the edit. off: ignore. (flux-fill uses its mask natively; this does not apply.)"}),
                 "mask_feather": ("INT", {"default": 4, "min": 0, "max": 200, "tooltip": "Gaussian feather (px) on the mask edge for a seamless composite."}),
                 "live_preview": ("BOOLEAN", {"default": True, "tooltip": "Stream the image as it denoises into the node, and drive the progress bar. Also enables the Cancel button mid-generation. Costs one VAE decode per shown step."}),
                 "preview_stride": ("INT", {"default": 2, "min": 1, "max": 20, "tooltip": "Show a preview every N steps (the last step is always shown). 1 = every step (slowest, smoothest). Higher = fewer decodes."}),
+                # Appended last on purpose. ComfyUI maps `widgets_values` positionally, so inserting a
+                # widget anywhere above would shift every value in already-saved graphs (mask_mode
+                # landing in this slot, mask_feather in mask_mode, and so on) with no error shown.
+                # A new widget at the end leaves old workflows reading exactly as before.
+                "control_type": ("STRING", {"default": "canny", "tooltip": "z-image-controlnet only. What each connected control image is: canny, depth, hed, mlsd or pose. One value applies to every image; a comma-separated list ('canny,depth') pairs with the MfluxImage chain in order, which is how you stack controls. Ignored by every other model."}),
             },
             "hidden": {"unique_id": "UNIQUE_ID"},
         }

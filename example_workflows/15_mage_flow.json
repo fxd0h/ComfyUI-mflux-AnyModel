@@ -1,0 +1,206 @@
+{
+  "last_node_id": 6,
+  "last_link_id": 4,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        20.0,
+        20.0
+      ],
+      "size": [
+        1200.0,
+        330.0
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "13 \u00b7 Krea 2 depth",
+      "properties": {},
+      "widgets_values": [
+        "# 15 \u00b7 Mage Flow\n\nMicrosoft's Mage Flow, text-to-image. `mage-flow-turbo` is the distilled one and is what you want\nfor iteration: it renders 1024x1024 in about 4 seconds on an M5 Max at q8.\n\n**Aliases:** `mage-flow-turbo` (distilled, fast), `mage-flow` and `mage-flow-base` (CFG variants,\nslower, they do take `guidance` and a negative prompt).\n\n**Instruction edit:** switch the loader to `mage-flow-edit-turbo` and connect a photo through\n`mflux Image`. It takes several references like qwen-edit does, so chain more `mflux Image` nodes\nfor multi-reference edits.\n\n**Things that silently go wrong:**\n- On the turbo alias `steps` and `guidance` are preset-driven; leaving both at 0 is correct and the\n  sampler ignores overrides in `auto` mode.\n- The edit alias needs at least one image. Without one the sampler refuses the run rather than\n  quietly generating from the prompt alone."
+      ],
+      "color": "#2a363b",
+      "bgcolor": "#1e2a30"
+    },
+    {
+      "id": 3,
+      "type": "MfluxModelLoader",
+      "pos": [
+        380.0,
+        400.0
+      ],
+      "size": [
+        340,
+        280
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "lora",
+          "type": "MFLUX_LORA",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MFLUX_MODEL",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MfluxModelLoader"
+      },
+      "widgets_values": [
+        "mage-flow-turbo",
+        "8",
+        "(none)",
+        "",
+        "",
+        1.0,
+        true,
+        true
+      ],
+      "title": "Loader \u00b7 krea-2-depth (set the path)",
+      "color": "#9e3f3f",
+      "bgcolor": "#322"
+    },
+    {
+      "id": 5,
+      "type": "MfluxModelSampler",
+      "pos": [
+        1100.0,
+        400.0
+      ],
+      "size": [
+        340,
+        440
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MFLUX_MODEL",
+          "link": 2
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "info",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MfluxModelSampler"
+      },
+      "widgets_values": [
+        "a lighthouse on a rocky coast at dusk, long exposure sea",
+        "auto",
+        "",
+        42,
+        "randomize",
+        0,
+        0.0,
+        1024,
+        1024,
+        "auto",
+        "(model default)",
+        false,
+        0.6,
+        "preserve",
+        4,
+        true,
+        2,
+        "canny"
+      ],
+      "title": "Sampler \u00b7 8 steps, guidance 1.0",
+      "color": "#9e3f3f",
+      "bgcolor": "#322"
+    },
+    {
+      "id": 6,
+      "type": "PreviewImage",
+      "pos": [
+        1460.0,
+        400.0
+      ],
+      "size": [
+        340,
+        300
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Result",
+      "color": "#555",
+      "bgcolor": "#222"
+    }
+  ],
+  "links": [
+    [
+      2,
+      3,
+      0,
+      5,
+      0,
+      "MFLUX_MODEL"
+    ],
+    [
+      4,
+      5,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
