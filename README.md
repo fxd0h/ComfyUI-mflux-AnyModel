@@ -198,10 +198,15 @@ catch upstream signature changes rather than drifting.
 
 ## Notes on mflux features
 
-The node is fork-agnostic: it adapts to whatever mflux is installed. Capabilities
-added by recent mflux work — LyCORIS LoKr LoRA loading, Z-Image sigma schedules and
-shift, Qwen edit fixes — are exposed automatically when present and simply absent
-when not.
+The node is fork-agnostic: it adapts to whatever mflux is installed. The sampler's
+extra widgets — PiD decode (`pid_decode` / `pid_degrade_sigma`, mflux-cv >= 0.18.33)
+and Z-Image's `shift` / `sigma_schedule` / `mcf_max_change` — are forwarded only when
+the installed model's `generate_image` actually declares them; on any other model a
+non-default value is dropped with a note in the info output, never silently swallowed.
+The same policy applies to `negative_prompt`: families whose encoder only builds the
+negative branch at guidance > 1.0 (Z-Image, Krea 2, Mage Flow) drop it with a note when
+the effective guidance sits at or below that, matching what `mflux-capabilities`
+(mflux >= 0.18.34) reports for the CLIs.
 
 ## Running the tests
 

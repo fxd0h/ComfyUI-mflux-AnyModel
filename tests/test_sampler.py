@@ -234,4 +234,37 @@ ok(D.supports_controlnet_stack(D.pick_model_class("dev-controlnet-canny")[0]), "
 ok(not D.supports_controlnet_stack(D.pick_model_class("krea-2-depth")[0]), "krea2-depth takes a single checkpoint")
 print("13. multi-ControlNet stacking (list per net, scalar when single) OK")
 
+
+# --- negative gated on effective guidance (the 0.18.34 conditional axis) ---
+pz = prof("z-image")
+fwd, notes = normalize_and_validate(pz, "auto", req(negative_prompt="blurry"), None)
+ok("negative_prompt" not in fwd and any("guidance" in n for n in notes),
+   "z-image negative dropped+noted at default guidance (effective 0.0)")
+fwd, _ = normalize_and_validate(pz, "auto", req(negative_prompt="blurry", guidance=4.0), None)
+ok(fwd.get("negative_prompt") == "blurry", "z-image negative forwarded at guidance 4.0")
+pk = prof("krea-2")
+fwd, notes = normalize_and_validate(pk, "auto", req(negative_prompt="blurry"), None)
+ok("negative_prompt" not in fwd and any("guidance" in n for n in notes),
+   "krea2 negative dropped+noted at default guidance 1.0")
+pm = prof("mage-flow")
+fwd, _ = normalize_and_validate(pm, "auto", req(negative_prompt="blurry"), None)
+ok(fwd.get("negative_prompt") == "blurry",
+   "mage-flow (non-turbo) negative forwarded: effective default guidance is 5.0")
+print("14. negative gated on effective guidance OK")
+
+# --- TIER 4 extras: signature-gated, inert defaults forward nothing ---
+fwd, notes = normalize_and_validate(pz, "auto", req(), None)
+for k in ("pid_decode", "pid_degrade_sigma", "shift", "sigma_schedule", "mcf_max_change"):
+    ok(k not in fwd, f"inert default '{k}' not forwarded")
+fwd, notes = normalize_and_validate(pz, "auto",
+                                    req(shift=3.0, sigma_schedule="cosine", mcf_max_change=0.1), None)
+ok(fwd.get("shift") == 3.0 and fwd.get("sigma_schedule") == "cosine" and fwd.get("mcf_max_change") == 0.1,
+   "z-image extras forwarded when set")
+if "pid_decode" in pz.gen_kwargs:
+    fwd, notes = normalize_and_validate(pz, "auto", req(pid_decode=True, pid_degrade_sigma=0.2), None)
+    ok(fwd.get("pid_decode") is True and fwd.get("pid_degrade_sigma") == 0.2, "pid extras forwarded when set")
+fwd, notes = normalize_and_validate(prof("qwen"), "auto", req(shift=3.0), None)
+ok("shift" not in fwd and any("shift" in n for n in notes), "unsupported extra dropped+noted, never silent")
+print("15. TIER 4 signature-gated extras OK")
+
 print(f"\nALL SELF-TESTS PASSED ({_checks} checks)")

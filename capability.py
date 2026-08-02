@@ -23,6 +23,15 @@ PRESET_ONLY = {"ideogram4"}
 # (verified inert). qwen / z-image / fibo / ernie do thread it through -> effective.
 NEGATIVE_INERT = {"flux"}
 
+# Families whose encoder only builds the negative branch at guidance > 1.0 (the
+# pair-encoder gate), mapped to the guidance the model uses when the user leaves the
+# widget at 0: z-image resolves None to 0.0 (Config), krea2 defaults to 1.0, mage-flow
+# (non-turbo) resolves to 5.0. Below the floor the negative prompt is never encoded, so
+# the sampler drops it with a note instead of forwarding it silently.
+# Cross-check source: `mflux-capabilities` (mflux >= 0.18.34) declares these
+# conditional/ignored per command from the same runtime constants the CLIs warn with.
+NEGATIVE_GUIDANCE_GATED = {"z-image": 0.0, "krea2": 1.0, "mage-flow": 5.0}
+
 # generate_image params that denote an input image the model consumes.
 IMAGE_ROLE_PARAMS = {
     "image_path", "masked_image_path", "depth_image_path", "redux_image_paths",
@@ -56,6 +65,10 @@ class CapabilityProfile:
     is_preset_only: bool = False
     presets: list = field(default_factory=list)
     required_gen_params: set = field(default_factory=set)  # generate_image params with no default
+    # Effective guidance the model runs with when the user leaves guidance unset, for
+    # families whose negative branch only exists at guidance > 1.0. None = the negative
+    # prompt is unconditional for this family.
+    negative_guidance_default: float | None = None
 
     @property
     def required_image_args(self):
@@ -104,4 +117,8 @@ def build_profile(cls, family: str, model_config=None) -> CapabilityProfile:
         is_preset_only=(family in PRESET_ONLY),
         presets=presets_for(family),
         required_gen_params=required_gen_params,
+        negative_guidance_default=next(
+            (floor for base, floor in NEGATIVE_GUIDANCE_GATED.items() if family == base or family.startswith(base + "-")),
+            None,
+        ),
     )

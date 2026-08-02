@@ -23,6 +23,8 @@ _LATENT_CREATORS = {
     "z-image": ("mflux.models.z_image.latent_creator.z_image_latent_creator", "ZImageLatentCreator"),
     "fibo": ("mflux.models.fibo.latent_creator.fibo_latent_creator", "FiboLatentCreator"),
     "ernie": ("mflux.models.ernie_image.latent_creator.ernie_latent_creator", "ErnieLatentCreator"),
+    "mage-flow": ("mflux.models.mage_flow.latent_creator.mage_flow_latent_creator", "MageFlowLatentCreator"),
+    # boogu has no LatentCreator in mflux yet; it falls through to progress-bar-only.
     "flux": ("mflux.models.flux.latent_creator.flux_latent_creator", "FluxLatentCreator"),
 }
 

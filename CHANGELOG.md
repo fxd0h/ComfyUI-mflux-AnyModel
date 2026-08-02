@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## [0.9.0]
+
+### Added
+- **NVIDIA PiD pixel-diffusion decoding** (`pid_decode` + `pid_degrade_sigma` on the sampler,
+  needs mflux-cv >= 0.18.33): replaces the VAE decode with a 4x super-resolving re-render, so a
+  512x512 generation returns 2048x2048. Weights download on first use (one checkpoint per model
+  family plus the gated `google/gemma-2-2b-it`). The live preview stays VAE-based at base
+  resolution, so it will not match the 4x output; the info string says so.
+- **Z-Image's `shift`, `sigma_schedule` and `mcf_max_change` are now really exposed** through a
+  signature-gated extras tier: each is forwarded only when the installed model's `generate_image`
+  declares it, and a non-default value on any other model is dropped with a note. The README
+  claimed this exposure since 0.5; the forwarding whitelist actually swallowed all three.
+- Live preview for Mage Flow: its latent creator was never registered, so the family silently
+  fell back to a bare progress bar. (Boogu still does: mflux ships no latent creator for it.)
+
+### Fixed
+- **`negative_prompt` is now dropped, with a note, when it cannot take effect**: on Z-Image,
+  Krea 2 and Mage Flow the encoder only builds the negative branch at guidance > 1.0, and the
+  effective default guidance on Z-Image (0.0) and Krea 2 (1.0) sits below that, so the sampler
+  used to forward a negative the model never encoded. Matches what `mflux-capabilities`
+  (mflux >= 0.18.34) reports for the same models on the CLI side, and the guidance-distilled
+  turbo variants get the same note through the existing supports_guidance gate.
+
 ## [0.8.1]
 
 ### Fixed

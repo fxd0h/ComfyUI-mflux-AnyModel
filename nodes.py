@@ -374,16 +374,48 @@ def normalize_and_validate(profile, params_mode, requested, image_paths):
     if user_guid and float(user_guid) > 0 and "guidance" in gen and profile.supports_guidance:
         out["guidance"] = float(user_guid)
 
-    # TIER 3 — drop-with-warning
+    # TIER 3 — drop-with-warning, keyed on EFFECTIVE behavior (mirrors mflux-capabilities):
+    # a family can take a negative prompt and still never encode it, either because CFG is
+    # disabled outright (guidance-distilled models) or because its encoder only builds the
+    # negative branch at guidance > 1.0 and the effective guidance sits at or below that.
     neg = requested.get("negative_prompt", "")
     if neg:
-        if profile.supports_negative:
-            out["negative_prompt"] = neg
-        else:
+        eff_guidance = out.get("guidance", profile.negative_guidance_default)
+        if not profile.supports_negative:
             notes.append(f"[mflux] negative_prompt has no effect on '{profile.family}'; dropped.")
+        elif not profile.supports_guidance:
+            notes.append(f"[mflux] negative_prompt has no effect on '{profile.family}': CFG is disabled on this model; dropped.")
+        elif profile.negative_guidance_default is not None and float(eff_guidance) <= 1.0:
+            notes.append(
+                f"[mflux] negative_prompt has no effect on '{profile.family}' at guidance <= 1.0 "
+                f"(effective guidance {float(eff_guidance):g}); raise guidance above 1.0 to enable it; dropped."
+            )
+        else:
+            out["negative_prompt"] = neg
     sch = requested.get("scheduler", "auto")
     if sch and sch != "auto" and "scheduler" in gen:
         out["scheduler"] = sch
+
+    # TIER 4 — signature-gated extras: forwarded only when the model's generate_image
+    # declares them AND the user moved them off their inert default. Requested-but-
+    # unsupported gets the same drop-with-note treatment as negative_prompt, never a
+    # silent swallow. This is what actually exposes Z-Image's shift/sigma_schedule/
+    # mcf_max_change and the PiD decoder without a per-model whitelist.
+    extras = (
+        ("pid_decode", False),
+        ("pid_degrade_sigma", 0.0),
+        ("shift", 0.0),
+        ("sigma_schedule", ""),
+        ("mcf_max_change", 0.0),
+    )
+    for name, inert in extras:
+        value = requested.get(name, inert)
+        if value == inert or value is None:
+            continue
+        if name in gen:
+            out[name] = value
+        else:
+            notes.append(f"[mflux] '{name}' is not supported by '{profile.family}'; dropped.")
 
     # image roles (img2img + variant roles)
     if has_image:
@@ -609,6 +641,13 @@ class MfluxModelSampler:
                 # landing in this slot, mask_feather in mask_mode, and so on) with no error shown.
                 # A new widget at the end leaves old workflows reading exactly as before.
                 "control_type": ("STRING", {"default": "canny", "tooltip": "z-image-controlnet only. What each connected control image is: canny, depth, hed, mlsd or pose. One value applies to every image; a comma-separated list ('canny,depth') pairs with the MfluxImage chain in order, which is how you stack controls. Ignored by every other model."}),
+                # The block below is also appended last (same widgets_values reasoning as above).
+                # Every widget's default is inert: an untouched graph forwards nothing new.
+                "pid_decode": ("BOOLEAN", {"default": False, "tooltip": "Decode through NVIDIA's PiD pixel-diffusion decoder instead of the VAE: a 4x super-resolving re-render (512 in, 2048 out). Downloads one PiD checkpoint per model family plus the gated google/gemma-2-2b-it on first use. The live preview stays VAE-based at base resolution, so it will not match the 4x output. Dropped with a note on models without PiD support."}),
+                "pid_degrade_sigma": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "PiD only: degrade the source latent before re-rendering, trading fidelity for invented detail. 0 = off."}),
+                "shift": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 12.0, "step": 0.1, "tooltip": "Z-Image: override the automatic sigma shift (mu). 0 = model default. Dropped with a note on models that do not take it."}),
+                "sigma_schedule": ("STRING", {"default": "", "tooltip": "Z-Image: sigma schedule shape — linear (default), cosine, karras or exponential. Empty = model default. Dropped with a note on models that do not take it."}),
+                "mcf_max_change": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 0.5, "step": 0.01, "tooltip": "Z-Image MCF sampler: cap the mean absolute change per denoising step (typical 0.05-0.5). 0 = off. Dropped with a note on models that do not take it."}),
             },
             "hidden": {"unique_id": "UNIQUE_ID"},
         }
@@ -623,7 +662,9 @@ class MfluxModelSampler:
                  preset="(model default)", strict_caption_validation=False,
                  image=None, image_strength=0.6, mflux_image=None, control_type="canny",
                  mask_mode="preserve", mask_feather=4,
-                 live_preview=True, preview_stride=2, unique_id=None):
+                 live_preview=True, preview_stride=2,
+                 pid_decode=False, pid_degrade_sigma=0.0, shift=0.0, sigma_schedule="",
+                 mcf_max_change=0.0, unique_id=None):
         handle = model
         prompt = _clean_caption_prompt(prompt)
         if handle.free_comfy_first:
@@ -663,8 +704,13 @@ class MfluxModelSampler:
                 "steps": steps, "guidance": guidance, "width": int(width), "height": int(height),
                 "scheduler": scheduler, "preset": preset,
                 "strict_caption_validation": strict_caption_validation,
+                "pid_decode": bool(pid_decode), "pid_degrade_sigma": float(pid_degrade_sigma),
+                "shift": float(shift), "sigma_schedule": (sigma_schedule or "").strip(),
+                "mcf_max_change": float(mcf_max_change),
             }
             forwarded, notes = normalize_and_validate(handle.profile, params_mode, requested, image_paths)
+            if forwarded.get("pid_decode") and live_preview:
+                notes.append("[mflux] pid_decode: the live preview decodes through the VAE at base resolution; the final image is PiD's 4x re-render and will differ.")
             if live_preview:
                 from .preview import ComfyLivePreview, _RegistryGuard, resolve_latent_creator
                 lc = resolve_latent_creator(handle.family)
