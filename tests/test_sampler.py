@@ -150,27 +150,33 @@ ok("dev-fill" in mc and "dev-kontext" in mc and "qwen-image-edit" in mc, "wired 
 ok("dev-fill-catvton" not in mc and "dev-controlnet-upscaler" not in mc, "unwired variants excluded")
 ok(not any(s in mc for s in D.SEEDVR2_ALIASES), "seedvr2 excluded")
 ok("none" in QUANTIZE_CHOICES and "8" in QUANTIZE_CHOICES, "quantize choices")
-ok("krea-2-depth" in mc, "krea2-depth (controlnet) must be in the dropdown now that controlnet_path is wired")
+if D.Krea2Depth is not None:
+    ok("krea-2-depth" in mc, "krea2-depth (controlnet) must be in the dropdown now that controlnet_path is wired")
+else:
+    ok("krea-2-depth" not in mc, "krea2-depth must degrade out of the dropdown on a runtime without the class")
 print("9. dropdown (base + wired variants) OK")
 
-# --- 10. krea2-depth image-role injection + needs-any-image gating ---
-pkd = prof("krea-2-depth")
-ok(pkd.image_role_args == {"image_path": "opt", "depth_image_path": "opt"}, "krea2-depth roles: image_path + depth_image_path, both opt")
-ok(not pkd.needs_image, "krea2-depth has no strictly-required image role")
-# a room photo alone -> image_path filled (DepthPro derives depth), no image_strength forced
-fwd, _ = normalize_and_validate(pkd, "auto", req(), img(primary="/tmp/room.png"))
-ok(fwd.get("image_path") == "/tmp/room.png", "krea2-depth: primary photo -> image_path")
-ok("image_strength" not in fwd, "krea2-depth: image_strength must NOT be forced (not in signature)")
-# a precomputed depth map on aux -> depth_image_path
-fwd, _ = normalize_and_validate(pkd, "auto", req(), img(primary="/tmp/room.png", aux="/tmp/depth.png"))
-ok(fwd.get("depth_image_path") == "/tmp/depth.png", "krea2-depth: aux map -> depth_image_path")
-# no image at all -> NEEDS_ANY_IMAGE hard-blocks
-try:
-    normalize_and_validate(pkd, "auto", req(), None)
-    ok(False, "krea2-depth with no image must raise")
-except ValueError:
-    ok(True, "krea2-depth with no image hard-blocks cleanly")
-print("10. krea2-depth injection + needs-any-image gating OK")
+# --- 10. krea2-depth image-role injection + needs-any-image gating (cv-only runtime) ---
+pkd = prof("krea-2-depth") if D.Krea2Depth is not None else None
+if pkd is not None:
+    ok(pkd.image_role_args == {"image_path": "opt", "depth_image_path": "opt"}, "krea2-depth roles: image_path + depth_image_path, both opt")
+    ok(not pkd.needs_image, "krea2-depth has no strictly-required image role")
+    # a room photo alone -> image_path filled (DepthPro derives depth), no image_strength forced
+    fwd, _ = normalize_and_validate(pkd, "auto", req(), img(primary="/tmp/room.png"))
+    ok(fwd.get("image_path") == "/tmp/room.png", "krea2-depth: primary photo -> image_path")
+    ok("image_strength" not in fwd, "krea2-depth: image_strength must NOT be forced (not in signature)")
+    # a precomputed depth map on aux -> depth_image_path
+    fwd, _ = normalize_and_validate(pkd, "auto", req(), img(primary="/tmp/room.png", aux="/tmp/depth.png"))
+    ok(fwd.get("depth_image_path") == "/tmp/depth.png", "krea2-depth: aux map -> depth_image_path")
+    # no image at all -> NEEDS_ANY_IMAGE hard-blocks
+    try:
+        normalize_and_validate(pkd, "auto", req(), None)
+        ok(False, "krea2-depth with no image must raise")
+    except ValueError:
+        ok(True, "krea2-depth with no image hard-blocks cleanly")
+    print("10. krea2-depth injection + needs-any-image gating OK")
+else:
+    print("10. krea2-depth injection skipped: runtime without Krea2Depth (upstream mflux)")
 
 # --- 11. mask-preserve composite helpers ---
 import numpy as np
@@ -230,7 +236,10 @@ pi2i = prof("dev")
 fwd, _ = normalize_and_validate(pi2i, "auto", req(), stack)
 ok(fwd.get("image_path") == "/tmp/depth.png", "img2img keeps the primary only, never a list")
 # the loader only offers stacking where mflux supports it
-ok(D.supports_controlnet_stack(D.pick_model_class("dev-controlnet-canny")[0]), "flux-controlnet can stack")
+import inspect as _insp
+_flux_cn = D.pick_model_class("dev-controlnet-canny")[0]
+_runtime_stacks = "controlnet_paths" in _insp.signature(_flux_cn.__init__).parameters
+ok(D.supports_controlnet_stack(_flux_cn) == _runtime_stacks, "stack support mirrors the runtime signature (plural on cv, singular upstream)")
 ok(not D.supports_controlnet_stack(D.pick_model_class("krea-2-depth")[0]), "krea2-depth takes a single checkpoint")
 print("13. multi-ControlNet stacking (list per net, scalar when single) OK")
 
@@ -246,20 +255,27 @@ pk = prof("krea-2")
 fwd, notes = normalize_and_validate(pk, "auto", req(negative_prompt="blurry"), None)
 ok("negative_prompt" not in fwd and any("guidance" in n for n in notes),
    "krea2 negative dropped+noted at default guidance 1.0")
-pm = prof("mage-flow")
-fwd, _ = normalize_and_validate(pm, "auto", req(negative_prompt="blurry"), None)
-ok(fwd.get("negative_prompt") == "blurry",
-   "mage-flow (non-turbo) negative forwarded: effective default guidance is 5.0")
-print("14. negative gated on effective guidance OK")
+if D.MageFlow is not None:
+    pm = prof("mage-flow")
+    fwd, _ = normalize_and_validate(pm, "auto", req(negative_prompt="blurry"), None)
+    ok(fwd.get("negative_prompt") == "blurry",
+       "mage-flow (non-turbo) negative forwarded: effective default guidance is 5.0")
+    print("14. negative gated on effective guidance OK")
+else:
+    pq = prof("qwen-image")
+    fwd, _ = normalize_and_validate(pq, "auto", req(negative_prompt="blurry"), None)
+    ok(fwd.get("negative_prompt") == "blurry", "qwen (CFG model) negative forwarded on upstream runtime")
+    print("14. negative gated on effective guidance OK (qwen stand-in, no MageFlow)")
 
 # --- TIER 4 extras: signature-gated, inert defaults forward nothing ---
 fwd, notes = normalize_and_validate(pz, "auto", req(), None)
 for k in ("pid_decode", "pid_degrade_sigma", "shift", "sigma_schedule", "mcf_max_change"):
     ok(k not in fwd, f"inert default '{k}' not forwarded")
-fwd, notes = normalize_and_validate(pz, "auto",
-                                    req(shift=3.0, sigma_schedule="cosine", mcf_max_change=0.1), None)
-ok(fwd.get("shift") == 3.0 and fwd.get("sigma_schedule") == "cosine" and fwd.get("mcf_max_change") == 0.1,
-   "z-image extras forwarded when set")
+if "shift" in pz.gen_kwargs:
+    fwd, notes = normalize_and_validate(pz, "auto",
+                                        req(shift=3.0, sigma_schedule="cosine", mcf_max_change=0.1), None)
+    ok(fwd.get("shift") == 3.0 and fwd.get("sigma_schedule") == "cosine" and fwd.get("mcf_max_change") == 0.1,
+       "z-image extras forwarded when set")
 if "pid_decode" in pz.gen_kwargs:
     fwd, notes = normalize_and_validate(pz, "auto", req(pid_decode=True, pid_degrade_sigma=0.2), None)
     ok(fwd.get("pid_decode") is True and fwd.get("pid_degrade_sigma") == 0.2, "pid extras forwarded when set")

@@ -1,14 +1,15 @@
 [project]
 name = "comfyui-mflux-anymodel"
-version = "0.9.0"
+version = "0.9.1"
 description = "Run any mflux/MLX model in ComfyUI on Apple Silicon, with a capability registry that forwards only the parameters each model accepts."
 authors = [{ name = "Mariano Abad" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.10"
-# Baseline is upstream mflux, which runs every workflow here except multi-ControlNet stacking.
-# That one needs the mflux-cv build (>= 0.18.25). Both ship the same `mflux` import package, so
-# this cannot be expressed as an alternative dependency; see the README for the swap.
+# Baseline is upstream mflux (mflux-community). The retired mflux-cv build, frozen at
+# 0.18.39-CV, is only needed for multi-ControlNet stacking, the Krea 2 depth ControlNet,
+# Mage Flow and Qwen-Image-Layered. Both ship the same `mflux` import package, so this
+# cannot be expressed as an alternative dependency; see the README for the swap.
 dependencies = ["mflux>=0.18.0"]
 
 [project.urls]

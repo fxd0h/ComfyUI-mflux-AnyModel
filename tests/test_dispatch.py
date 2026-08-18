@@ -12,6 +12,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
 import mflux_dispatch as D
+import nodes
 import capability as C
 from mflux.models.flux.variants.txt2img.flux import Flux1
 from mflux.models.fibo.variants.txt2img.fibo import FIBO
@@ -42,7 +43,7 @@ for alias in D.ALIAS_DISPATCH:
 print("1. variant aliases dispatch to dedicated classes (no txt2img degradation) OK")
 
 # ---- 2. every dropdown-eligible alias resolves to a config + class ----
-dropdown = [m for m in (list(ui.MODEL_CHOICES) + list(AVAILABLE_MODELS))
+dropdown = [m for m in (list(nodes.MODEL_CHOICES) + list(AVAILABLE_MODELS))
             if m not in D.SEEDVR2_ALIASES]
 for alias in dropdown:
     cls, family, cfg, path = D.resolve_config_and_path(alias)
@@ -58,7 +59,9 @@ print(f"2. all {len(dropdown)} builtin aliases resolve (class+config, path as ex
 
 # ---- 3. constructor-kwarg adaptation (pure, no weight load) ----
 kw_ideo = D.build_kwargs(Ideogram4, quantize=8, bake_lora=True, lora_paths=["x"], lora_scales=[1.0])
-ok("bake_lora" not in kw_ideo, "Ideogram4 must NOT receive bake_lora")
+import inspect as _insp
+_ideo_takes_bake = "bake_lora" in _insp.signature(Ideogram4.__init__).parameters
+ok(("bake_lora" in kw_ideo) == _ideo_takes_bake, "bake_lora forwarded to Ideogram4 exactly when its signature takes it")
 ok("lora_paths" in kw_ideo and "model_config" in kw_ideo, "Ideogram4 must accept lora + config")
 kw_cn = D.build_kwargs(Flux1Controlnet, controlnet_path="cn", bake_lora=True)
 ok("controlnet_path" in kw_cn, "Flux1Controlnet must receive controlnet_path")
@@ -68,23 +71,27 @@ ok("controlnet_path" not in kw_flux, "Flux1 must NOT receive controlnet_path")
 print("3. build_kwargs adapts to each constructor (ideo no bake_lora, cn has controlnet_path) OK")
 
 # ---- 3b. krea2-depth controlnet wiring ----
-from mflux.models.krea2.variants.controlnet.krea2_depth import Krea2Depth
-from mflux.models.krea2.variants.txt2img.krea2 import Krea2
-cls_kd, fam_kd = D.pick_model_class("krea-2-depth")
-ok(cls_kd is Krea2Depth and fam_kd == "krea2-depth", "krea-2-depth must dispatch to Krea2Depth")
-ok(D.pick_model_class("krea2-depth")[0] is Krea2Depth, "krea2-depth spelling alias must dispatch to Krea2Depth")
-ok(D.pick_model_class("krea-2")[0] is Krea2, "plain krea-2 must STILL be txt2img Krea2, not depth")
-ok(D.requires_controlnet_path(Krea2Depth), "Krea2Depth must require controlnet_path")
-ok(not D.requires_controlnet_path(Flux1Controlnet), "Flux1Controlnet controlnet_path is optional")
-_, _, cfg_kd, path_kd = D.resolve_config_and_path("krea-2-depth")
-ok(cfg_kd is not None and path_kd is None, "krea-2-depth resolves to the krea2 config, path None")
-kw_kd = D.build_kwargs(Krea2Depth, controlnet_path="ckpt", controlnet_strength=0.8, bake_lora=True)
-ok(kw_kd.get("controlnet_path") == "ckpt", "Krea2Depth must receive controlnet_path")
-ok(kw_kd.get("controlnet_strength") == 0.8, "Krea2Depth must receive controlnet_strength (constructor arg)")
-ok("bake_lora" not in kw_kd, "Krea2Depth has no bake_lora arg")
-ok("krea2-depth" in D.WIRED_VARIANT_FAMILIES, "krea2-depth must be a wired variant family")
-ok("krea2-depth" in D.NEEDS_ANY_IMAGE, "krea2-depth must be flagged as needing an image source")
-print("3b. krea2-depth wiring (controlnet_path required, krea2 config, strength passthrough) OK")
+if D.Krea2Depth is not None:
+    from mflux.models.krea2.variants.controlnet.krea2_depth import Krea2Depth
+    from mflux.models.krea2.variants.txt2img.krea2 import Krea2
+    cls_kd, fam_kd = D.pick_model_class("krea-2-depth")
+    ok(cls_kd is Krea2Depth and fam_kd == "krea2-depth", "krea-2-depth must dispatch to Krea2Depth")
+    ok(D.pick_model_class("krea2-depth")[0] is Krea2Depth, "krea2-depth spelling alias must dispatch to Krea2Depth")
+    ok(D.pick_model_class("krea-2")[0] is Krea2, "plain krea-2 must STILL be txt2img Krea2, not depth")
+    ok(D.requires_controlnet_path(Krea2Depth), "Krea2Depth must require controlnet_path")
+    ok(not D.requires_controlnet_path(Flux1Controlnet), "Flux1Controlnet controlnet_path is optional")
+    _, _, cfg_kd, path_kd = D.resolve_config_and_path("krea-2-depth")
+    ok(cfg_kd is not None and path_kd is None, "krea-2-depth resolves to the krea2 config, path None")
+    kw_kd = D.build_kwargs(Krea2Depth, controlnet_path="ckpt", controlnet_strength=0.8, bake_lora=True)
+    ok(kw_kd.get("controlnet_path") == "ckpt", "Krea2Depth must receive controlnet_path")
+    ok(kw_kd.get("controlnet_strength") == 0.8, "Krea2Depth must receive controlnet_strength (constructor arg)")
+    ok("bake_lora" not in kw_kd, "Krea2Depth has no bake_lora arg")
+    ok("krea2-depth" in D.WIRED_VARIANT_FAMILIES, "krea2-depth must be a wired variant family")
+    ok("krea2-depth" in D.NEEDS_ANY_IMAGE, "krea2-depth must be flagged as needing an image source")
+    print("3b. krea2-depth wiring (controlnet_path required, krea2 config, strength passthrough) OK")
+else:
+    ok(D.pick_model_class("krea-2")[0].__name__ == "Krea2", "plain krea-2 still txt2img on upstream")
+    print("3b. krea2-depth wiring skipped: runtime without Krea2Depth (upstream mflux)")
 
 # ---- 3c. dev-redux base resolution (adapter-only repo needs the FLUX.1-dev base) ----
 _, fam_rdx, _, path_rdx = D.resolve_config_and_path("dev-redux")
@@ -116,7 +123,9 @@ p_qwen = prof("qwen")
 ok(p_qwen.supports_negative is True, "qwen negative_prompt is effective")
 
 p_z = prof("z-image-turbo")
-ok({"shift", "sigma_schedule", "mcf_max_change"} <= p_z.gen_kwargs, "z-image missing #353 kwargs")
+_z_extras = {"shift", "sigma_schedule", "mcf_max_change"} & p_z.gen_kwargs
+ok(_z_extras == ({"shift", "sigma_schedule", "mcf_max_change"} if _z_extras else set()),
+   "z-image #353 kwargs: all present (cv runtime) or none (upstream)")
 
 p_fill = prof("dev-fill")
 ok("masked_image_path" in p_fill.required_image_args, "fill must require masked_image_path")

@@ -23,6 +23,14 @@ import numpy as np
 import torch
 
 from mflux.cli.defaults import defaults as ui
+from mflux.models.common.config.model_config import AVAILABLE_MODELS as _REGISTRY
+
+# Upstream #592 removed the hand-maintained ui.MODEL_CHOICES and derives CLI choices
+# from the registry instead; mflux-cv 0.18.x still ships it. Same derivation here,
+# with the old constant as the fallback so both runtimes keep working.
+MODEL_CHOICES = getattr(ui, "MODEL_CHOICES", None) or [
+    alias for config in _REGISTRY.values() for alias in config.aliases
+]
 from mflux.models.common.config import ModelConfig
 from mflux.utils.scale_factor import ScaleFactor
 
@@ -109,7 +117,7 @@ def model_choices():
     403). The mark is a best-effort hint and is stripped before loading."""
     allowed = D.BASE_FAMILIES | D.WIRED_VARIANT_FAMILIES
     seen, have, need = set(), [], []
-    for k in list(ui.MODEL_CHOICES) + list(D.ALIAS_DISPATCH) + list(D.DROPDOWN_EXTRA):
+    for k in list(MODEL_CHOICES) + list(D.ALIAS_DISPATCH) + list(D.DROPDOWN_EXTRA):
         if k in seen or k in D.SEEDVR2_ALIASES or k in D.NON_SAMPLER_ALIASES:
             continue
         seen.add(k)
@@ -512,7 +520,7 @@ class MfluxModelLoader:
                 "quantize": (QUANTIZE_CHOICES, {"default": "none"}),
             },
             "optional": {
-                "base_model": (["(none)"] + list(ui.MODEL_CHOICES), {"default": "(none)"}),
+                "base_model": (["(none)"] + list(MODEL_CHOICES), {"default": "(none)"}),
                 "model_path": ("STRING", {"default": "", "tooltip": "HF org/model or local path; overrides 'model' as the load target."}),
                 "lora": ("MFLUX_LORA",),
                 "controlnet_path": ("STRING", {"multiline": True, "default": "", "tooltip": "ControlNet checkpoint: a local path or an HF repo. REQUIRED for krea-2-depth (the depth-control checkpoint). On flux-controlnet you can STACK several by putting ONE PER LINE (e.g. a depth net and a canny net); then chain one MfluxImage per controlnet, in the same order, each with its own strength."}),

@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The format is loosely
 based on Keep a Changelog.
 
+## 0.9.1
+
+Runs on upstream mflux (mflux-community) as the primary runtime; mflux-cv is retired and frozen
+at 0.18.39-CV.
+
+- The model dropdown derives from `AVAILABLE_MODELS` when the runtime has no `ui.MODEL_CHOICES`
+  (upstream removed the hand-maintained list in mflux-community/mflux#592); the old constant
+  remains the fallback on cv.
+- Self-tests no longer assume cv: cv-only assertions (krea2-depth wiring, Mage Flow negative
+  routing, Z-Image #353 extras, ControlNet stacking, Ideogram 4 without `bake_lora`) now key on
+  the installed runtime's actual signatures, and assert clean degradation when a class is absent.
+- Smoke test counts the classes that are still cv-only (Krea2Depth, MageFlow, MageFlowEdit);
+  Krea 2 and Boogu graduated upstream.
+
 ## [0.9.0]
 
 ### Added

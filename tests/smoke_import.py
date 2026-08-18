@@ -39,5 +39,6 @@ for alias in D.DROPDOWN_EXTRA:
 choices = [nodes.strip_mark(m) for m in nodes.model_choices()]
 assert any("schnell" in m for m in choices), "dropdown must contain the base schnell model"
 
-n_fork = sum(getattr(D, c) is not None for c in ("Krea2", "Krea2Depth", "BooguImage"))
+# Krea2 and BooguImage graduated to upstream; these three are the ones still cv-only.
+n_fork = sum(getattr(D, c) is not None for c in ("Krea2Depth", "MageFlow", "MageFlowEdit"))
 print(f"SMOKE OK — node loads. fork-only classes present: {n_fork}/3, dropdown models: {len(choices)}")

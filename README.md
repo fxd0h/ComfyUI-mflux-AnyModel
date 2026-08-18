@@ -54,10 +54,12 @@ Restart ComfyUI.
 
 ### Running on mflux-CV instead
 
-[mflux-CV](https://github.com/HowDidTheCatGetSoFat/mflux-cv) is a community build of mflux kept
-rebased on upstream `main`, carrying curated fixes and community PRs ahead of an upstream release.
-The node detects whichever one is installed, so this is optional, and it is what the multi-ControlNet
-stacking described below requires (>= 0.18.25).
+[mflux-CV](https://github.com/HowDidTheCatGetSoFat/mflux-cv) was a community build of mflux carrying
+fixes ahead of upstream releases. It is retired: development moved to
+[mflux-community/mflux](https://github.com/mflux-community/mflux) and the fixes were merged, so
+upstream `mflux` is the recommended install. The node detects whichever one is present. The frozen
+0.18.39-CV build remains the only way to get multi-ControlNet stacking, the Krea 2 depth ControlNet,
+Mage Flow and Qwen-Image-Layered; everything else in this README runs on upstream.
 
 ```
 ComfyUI/.venv/bin/pip uninstall -y mflux
@@ -199,7 +201,7 @@ catch upstream signature changes rather than drifting.
 ## Notes on mflux features
 
 The node is fork-agnostic: it adapts to whatever mflux is installed. The sampler's
-extra widgets — PiD decode (`pid_decode` / `pid_degrade_sigma`, mflux-cv >= 0.18.33)
+extra widgets — PiD decode (`pid_decode` / `pid_degrade_sigma`, upstream >= 0.18.1 or mflux-cv >= 0.18.33)
 and Z-Image's `shift` / `sigma_schedule` / `mcf_max_change` — are forwarded only when
 the installed model's `generate_image` actually declares them; on any other model a
 non-default value is dropped with a note in the info output, never silently swallowed.
