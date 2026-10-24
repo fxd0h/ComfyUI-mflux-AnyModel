@@ -115,6 +115,22 @@ a model that is not in the dropdown; it is dispatched to the right architecture 
 name, and rejected with a clear message if it is not a sampler model (for example a
 SeedVR2 upscaler).
 
+Local model folders (a saved or prequantized mflux pack, or a symlink to a HuggingFace
+snapshot) can also be picked from the loader's `local_model` dropdown. It lists each
+subfolder with weights in ComfyUI's `mflux` model paths: `models/mflux`, plus any
+`mflux:` entry in `extra_model_paths.yaml`:
+
+```yaml
+my_models:
+  base_path: /path/to/models
+  mflux: mflux-packs/
+```
+
+`local_model` overrides `model_path`. `model` still picks the architecture, so set it to
+the model the folder holds. The `⬇` mark is checked against the cache mflux downloads into
+(`HF_HUB_CACHE`, else `HF_HOME/hub`, else `~/.cache/huggingface/hub`), and a saved workflow
+validates whether or not its model name carries the mark.
+
 ## Example workflows
 
 `example_workflows/` ships a set of small, openable workflows (drag one onto the

@@ -310,4 +310,42 @@ if D.QwenImage21 is not None:
 else:
     print("16. Qwen-Image-2.1 roles skipped: runtime without QwenImage21")
 
+# --- 17. the download mark follows HF_HUB_CACHE; local model folders; mark-tolerant validation ---
+import tempfile
+import nodes as N
+
+_saved_env = {k: os.environ.pop(k, None) for k in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "HF_HOME", "XDG_CACHE_HOME")}
+with tempfile.TemporaryDirectory() as tmp:
+    os.environ["HF_HOME"] = os.path.join(tmp, "hfhome")
+    ok(N._hf_hub_cache() == os.path.join(tmp, "hfhome", "hub"), "HF_HOME/hub is the cache when HF_HUB_CACHE is unset")
+    hub = os.path.join(tmp, "hub")
+    os.environ["HF_HUB_CACHE"] = hub
+    ok(N._hf_hub_cache() == hub, "HF_HUB_CACHE wins over HF_HOME")
+    ok(not N._repo_cached("org/model"), "an absent repo is not cached")
+    snap = os.path.join(hub, "models--org--model", "snapshots", "abc")
+    os.makedirs(snap)
+    open(os.path.join(snap, "model.safetensors"), "w").close()
+    ok(N._repo_cached("org/model"), "a repo in HF_HUB_CACHE counts as downloaded")
+
+    roots = [os.path.join(tmp, "a"), os.path.join(tmp, "b")]
+    for root, name in ((roots[0], "pack-q4"), (roots[1], "pack-q4"), (roots[1], "other"), (roots[1], "empty")):
+        os.makedirs(os.path.join(root, name, "transformer"), exist_ok=True)
+        if name != "empty":
+            open(os.path.join(root, name, "transformer", "0.safetensors"), "w").close()
+    found = N.local_models(roots)
+    ok(sorted(found) == ["other", "pack-q4"], "only subfolders with weights are listed")
+    ok(found["pack-q4"] == os.path.join(roots[0], "pack-q4"), "the first root wins a duplicate name")
+    ok(N.local_models([os.path.join(tmp, "missing")]) == {}, "a missing root is skipped")
+for k, v in _saved_env.items():
+    os.environ.pop(k, None)
+    if v is not None:
+        os.environ[k] = v
+
+ok(N.MfluxModelLoader.VALIDATE_INPUTS("schnell") is True, "a clean alias validates")
+ok(N.MfluxModelLoader.VALIDATE_INPUTS("schnell" + N.NEEDS_DL) is True, "a marked alias validates")
+ok(isinstance(N.MfluxModelLoader.VALIDATE_INPUTS("not-a-model"), str), "an unknown alias is rejected with a message")
+spec = N.MfluxModelLoader.INPUT_TYPES()["optional"]
+ok(list(spec)[-1] == "local_model" and spec["local_model"][0][0] == N.NO_LOCAL, "local_model is the last widget, (none) first")
+print("17. HF cache, local model folders and mark-tolerant validation OK")
+
 print(f"\nALL SELF-TESTS PASSED ({_checks} checks)")

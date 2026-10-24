@@ -74,7 +74,62 @@ QUANTIZE_CHOICES = ["none"] + [str(q) for q in sorted(ui.QUANTIZE_CHOICES)]
 
 
 NEEDS_DL = " ⬇"           # marks a dropdown model not present in the local HF cache
-_HF_CACHE = os.path.expanduser("~/.cache/huggingface/hub")
+NO_LOCAL = "(none)"
+LOCAL_FOLDER = "mflux"      # ComfyUI model folder type for local mflux model folders
+
+if folder_paths is not None:
+    # models/mflux by default. An "mflux:" entry in extra_model_paths.yaml is loaded before
+    # custom nodes import, and this appends to it rather than replacing it.
+    try:
+        folder_paths.add_model_folder_path(LOCAL_FOLDER, os.path.join(folder_paths.models_dir, LOCAL_FOLDER))
+    except Exception:
+        pass
+
+
+def _hf_hub_cache():
+    """The HuggingFace hub cache mflux downloads into, resolved as huggingface_hub does:
+    HF_HUB_CACHE, then HUGGINGFACE_HUB_CACHE, then HF_HOME/hub, then
+    XDG_CACHE_HOME/huggingface/hub, then ~/.cache/huggingface/hub. Read per call, so the
+    mark follows the environment ComfyUI was started with."""
+    env = os.environ
+    for var in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"):
+        if env.get(var):
+            return os.path.expanduser(env[var])
+    if env.get("HF_HOME"):
+        return os.path.join(os.path.expanduser(env["HF_HOME"]), "hub")
+    xdg = os.path.expanduser(env.get("XDG_CACHE_HOME") or "~/.cache")
+    return os.path.join(xdg, "huggingface", "hub")
+
+
+def _local_roots():
+    if folder_paths is None:
+        return []
+    try:
+        return folder_paths.get_folder_paths(LOCAL_FOLDER)
+    except Exception:
+        return []
+
+
+def _has_weights(folder):
+    return bool(glob.glob(os.path.join(folder, "**", "*.safetensors"), recursive=True)
+                or glob.glob(os.path.join(folder, "**", "*.gguf"), recursive=True))
+
+
+def local_models(roots=None):
+    """{name: path} for each model folder in ComfyUI's 'mflux' model paths: an immediate
+    subfolder (or a symlink to one) that holds .safetensors or .gguf weights. A name found
+    under two roots resolves to the first, matching ComfyUI's folder order."""
+    found = {}
+    for root in _local_roots() if roots is None else roots:
+        try:
+            names = sorted(os.listdir(root))
+        except OSError:
+            continue
+        for name in names:
+            path = os.path.join(root, name)
+            if name not in found and not name.startswith(".") and os.path.isdir(path) and _has_weights(path):
+                found[name] = path
+    return found
 
 
 def _repo_cached(repo):
@@ -83,13 +138,9 @@ def _repo_cached(repo):
     a fetch when selected)."""
     if not repo or "/" not in str(repo):
         return False
-    base = os.path.join(_HF_CACHE, "models--" + str(repo).replace("/", "--"))
+    base = os.path.join(_hf_hub_cache(), "models--" + str(repo).replace("/", "--"))
     snaps = os.path.join(base, "snapshots")
-    if not os.path.isdir(snaps):
-        return False
-    has_weights = bool(glob.glob(os.path.join(snaps, "**", "*.safetensors"), recursive=True)
-                       or glob.glob(os.path.join(snaps, "**", "*.gguf"), recursive=True))
-    if not has_weights:
+    if not os.path.isdir(snaps) or not _has_weights(snaps):
         return False
     if glob.glob(os.path.join(base, "blobs", "*.incomplete")):  # partial download
         return False
@@ -109,25 +160,32 @@ def strip_mark(name):
     return name[:-len(NEEDS_DL)] if name.endswith(NEEDS_DL) else name
 
 
-def model_choices():
-    """Curated dropdown of the models the sampler can drive (base txt2img + the
-    wired image-conditioned variants; seedvr2/diptych excluded). Locally-downloaded
-    models are listed first with clean names; models not in the HF cache come after,
-    marked with NEEDS_DL so you can see they would trigger a download (gated repos a
-    403). The mark is a best-effort hint and is stripped before loading."""
+def sampler_aliases():
+    """The aliases the sampler can drive (base txt2img + the wired image-conditioned
+    variants; seedvr2/diptych excluded), in dropdown order, without the download mark."""
     allowed = D.BASE_FAMILIES | D.WIRED_VARIANT_FAMILIES
-    seen, have, need = set(), [], []
+    seen, out = set(), []
     for k in list(MODEL_CHOICES) + list(D.ALIAS_DISPATCH) + list(D.DROPDOWN_EXTRA):
         if k in seen or k in D.SEEDVR2_ALIASES or k in D.NON_SAMPLER_ALIASES:
             continue
         seen.add(k)
         try:
             _, fam = D.pick_model_class(k)
-            if fam not in allowed:
-                continue
-            (have if _is_downloaded(k) else need).append(k)
+            if fam in allowed:
+                out.append(k)
         except Exception:
             pass
+    return out
+
+
+def model_choices():
+    """Curated dropdown of sampler_aliases(). Locally-downloaded models are listed first
+    with clean names; models not in the HF cache come after, marked with NEEDS_DL so you
+    can see they would trigger a download (gated repos a 403). The mark is a best-effort
+    hint and is stripped before loading."""
+    have, need = [], []
+    for k in sampler_aliases():
+        (have if _is_downloaded(k) else need).append(k)
     return have + [k + NEEDS_DL for k in need]
 
 
@@ -539,6 +597,8 @@ class MfluxModelLoader:
                 "keep_loaded": ("BOOLEAN", {"default": True}),
                 "free_comfy_first": ("BOOLEAN", {"default": True}),
                 "bake_lora": ("BOOLEAN", {"default": True, "tooltip": "Merge LoRA deltas into the base weights (faster). Turn off to apply the full update: in bf16, baking keeps only the part of each delta larger than the weights' rounding step (mflux warns how much)."}),
+                # Last, so workflows saved before it existed keep their widget values in place.
+                "local_model": ([NO_LOCAL] + list(local_models()), {"default": NO_LOCAL, "tooltip": "A model folder from ComfyUI's 'mflux' model paths: models/mflux, plus any 'mflux:' entry in extra_model_paths.yaml. Overrides model_path. 'model' still picks the architecture, so set it to the model the folder holds."}),
             },
         }
 
@@ -547,10 +607,23 @@ class MfluxModelLoader:
     FUNCTION = "load"
     CATEGORY = "MLX/mflux/loaders"
 
+    @classmethod
+    def VALIDATE_INPUTS(cls, model):
+        # Accept an alias with or without the download mark: the mark tracks the cache, so a
+        # saved workflow's label would otherwise stop validating once a model is downloaded.
+        if strip_mark(model) in sampler_aliases():
+            return True
+        return f"Unknown model '{model}'. Pick one from the dropdown; a repo or local path goes in model_path or local_model."
+
     def load(self, model, quantize, base_model="(none)", model_path="",
              lora=None, controlnet_path="", controlnet_strength=1.0,
-             keep_loaded=True, free_comfy_first=True, bake_lora=True):
+             keep_loaded=True, free_comfy_first=True, bake_lora=True, local_model=NO_LOCAL):
         model = strip_mark(model)          # drop the dropdown "needs download" mark
+        if local_model and local_model != NO_LOCAL:
+            folder = local_models().get(local_model)
+            if folder is None:
+                raise ValueError(f"local_model '{local_model}' is no longer in the mflux model folders.")
+            model_path = folder
         base = "" if base_model in ("(none)", "") else base_model
         q = None if quantize == "none" else int(quantize)
         lp = [p for p, s in lora] if lora else None
