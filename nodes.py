@@ -52,6 +52,15 @@ except Exception:
     folder_paths = None
 
 
+def _memory_policy():
+    """Import memory_policy both as a package (ComfyUI) and as a loose module (the self-tests)."""
+    try:
+        from . import memory_policy
+    except ImportError:
+        import memory_policy
+    return memory_policy
+
+
 def _lora_files():
     """LoRA filenames ComfyUI knows about (from the configured loras dirs)."""
     if folder_paths is None:
@@ -144,6 +153,8 @@ class MfluxModelHandle:
     cache_key: tuple
     free_comfy_first: bool = True
     lora_note: str = ""
+    keep_loaded: bool = True
+    low_ram: bool = True
 
     def __repr__(self) -> str:
         # Deliberately shallow. When a node raises, ComfyUI formats every input with str() to build
@@ -539,6 +550,8 @@ class MfluxModelLoader:
                 "keep_loaded": ("BOOLEAN", {"default": True}),
                 "free_comfy_first": ("BOOLEAN", {"default": True}),
                 "bake_lora": ("BOOLEAN", {"default": True, "tooltip": "Merge LoRA deltas into the base weights (faster). Turn off to apply the full update: in bf16, baking keeps only the part of each delta larger than the weights' rounding step (mflux warns how much)."}),
+                # Appended last so already-saved graphs keep their widgets_values positions.
+                "low_ram": ("BOOLEAN", {"default": True, "tooltip": "Cap the MLX cache at 1 GB for this run (mflux --low-ram). With keep_loaded off, the text encoder is dropped after encoding and the transformer before the VAE decode. Leave this on for a 4-bit pack; off keeps the old unbounded cache."}),
             },
         }
 
@@ -547,9 +560,17 @@ class MfluxModelLoader:
     FUNCTION = "load"
     CATEGORY = "MLX/mflux/loaders"
 
+    @classmethod
+    def IS_CHANGED(cls, keep_loaded=True, **_inputs):
+        # keep_loaded off: the sampler releases the model after each image, so the handle ComfyUI
+        # cached from the last run is empty. NaN never equals itself, so the loader runs again
+        # instead of handing the sampler that empty handle (a second queue of the same graph
+        # otherwise failed with "'NoneType' object has no attribute ...").
+        return float("nan") if not keep_loaded else ""
+
     def load(self, model, quantize, base_model="(none)", model_path="",
              lora=None, controlnet_path="", controlnet_strength=1.0,
-             keep_loaded=True, free_comfy_first=True, bake_lora=True):
+             keep_loaded=True, free_comfy_first=True, bake_lora=True, low_ram=True):
         model = strip_mark(model)          # drop the dropdown "needs download" mark
         base = "" if base_model in ("(none)", "") else base_model
         q = None if quantize == "none" else int(quantize)
@@ -579,52 +600,69 @@ class MfluxModelLoader:
         cache_key = (family, path or model, q, tuple(lp or ()), tuple(ls or ()), base,
                      tuple(cn_paths), float(controlnet_strength), bool(bake_lora))
 
-        lora_note = ""
-        if keep_loaded and _CACHE["key"] == cache_key:
-            instance = _CACHE["model"]
-        else:
-            if free_comfy_first:
-                _free_comfy()
-            try:
-                instance = D.build_model(
-                    cls, quantize=q, model_config=cfg, model_path=path,
-                    lora_paths=lp, lora_scales=ls, bake_lora=bool(bake_lora),
-                    controlnet_paths=cn_paths, controlnet_path=cn_paths[0] if cn_paths else None,
-                    controlnet_strength=float(controlnet_strength),
-                )
-            except Exception as e:
-                blob = (type(e).__name__ + " " + str(e)).lower()
-                if "no lora layers were applied" in blob and lp:
-                    # LoRA built for another architecture -> load WITHOUT it and keep going,
-                    # so switching models with a LoRA attached never hard-crashes.
-                    names = ", ".join(os.path.basename(p) for p in lp)
-                    lora_note = (f"[mflux] LoRA [{names}] is incompatible with '{model}' (built for a "
-                                 f"different architecture) — loaded WITHOUT it. Use a LoRA made for '{model}'.")
-                    print(lora_note)
-                    instance = D.build_model(
-                        cls, quantize=q, model_config=cfg, model_path=path,
-                        lora_paths=None, lora_scales=None, bake_lora=True,
-                        controlnet_paths=cn_paths, controlnet_path=cn_paths[0] if cn_paths else None,
-                        controlnet_strength=float(controlnet_strength),
-                    )
-                elif any(t in blob for t in ("gated", "restricted", "403", "401")):
-                    raise RuntimeError(
-                        f"'{model}' is gated or not downloaded: mflux tried to fetch it from "
-                        f"HuggingFace and was denied. Request access on its HF page and set "
-                        f"HF_TOKEN, or pick a model shown without the '{NEEDS_DL.strip()}' mark."
-                    ) from e
-                else:
-                    raise
-            _CACHE["key"] = cache_key if keep_loaded else None
-            _CACHE["model"] = instance if keep_loaded else None
+        # Unload happens after validation, so a bad path does not drop a resident model
+        # that this load never uses. On a build failure the hold is released again.
+        run_hook = _memory_policy().run_hook
+        run_hook("MFLUX_BEFORE_LOAD", required=True)
+        try:
+            instance, lora_note = _load_instance(
+                cls, cfg, path, q, lp, ls, cn_paths, controlnet_strength, bake_lora,
+                keep_loaded, free_comfy_first, cache_key, model,
+            )
+        except Exception:
+            run_hook("MFLUX_AFTER_FREE", required=False)
+            raise
 
         profile = C.build_profile(cls, family, cfg)
         handle = MfluxModelHandle(
             instance=instance, family=family, model_config=cfg, alias=model,
             profile=profile, cache_key=cache_key, free_comfy_first=free_comfy_first,
-            lora_note=lora_note,
+            lora_note=lora_note, keep_loaded=bool(keep_loaded), low_ram=bool(low_ram),
         )
         return (handle,)
+
+
+def _load_instance(cls, cfg, path, q, lp, ls, cn_paths, controlnet_strength, bake_lora,
+                   keep_loaded, free_comfy_first, cache_key, model):
+    """Return (instance, lora_note). A failed build leaves the caller's hold to release."""
+    lora_note = ""
+    if keep_loaded and _CACHE["key"] == cache_key:
+        return _CACHE["model"], lora_note
+    if free_comfy_first:
+        _free_comfy()
+    try:
+        instance = D.build_model(
+            cls, quantize=q, model_config=cfg, model_path=path,
+            lora_paths=lp, lora_scales=ls, bake_lora=bool(bake_lora),
+            controlnet_paths=cn_paths, controlnet_path=cn_paths[0] if cn_paths else None,
+            controlnet_strength=float(controlnet_strength),
+        )
+    except Exception as e:
+        blob = (type(e).__name__ + " " + str(e)).lower()
+        if "no lora layers were applied" in blob and lp:
+            # LoRA built for another architecture -> load WITHOUT it and keep going,
+            # so switching models with a LoRA attached never hard-crashes.
+            names = ", ".join(os.path.basename(p) for p in lp)
+            lora_note = (f"[mflux] LoRA [{names}] is incompatible with '{model}' (built for a "
+                         f"different architecture) — loaded WITHOUT it. Use a LoRA made for '{model}'.")
+            print(lora_note)
+            instance = D.build_model(
+                cls, quantize=q, model_config=cfg, model_path=path,
+                lora_paths=None, lora_scales=None, bake_lora=True,
+                controlnet_paths=cn_paths, controlnet_path=cn_paths[0] if cn_paths else None,
+                controlnet_strength=float(controlnet_strength),
+            )
+        elif any(t in blob for t in ("gated", "restricted", "403", "401")):
+            raise RuntimeError(
+                f"'{model}' is gated or not downloaded: mflux tried to fetch it from "
+                f"HuggingFace and was denied. Request access on its HF page and set "
+                f"HF_TOKEN, or pick a model shown without the '{NEEDS_DL.strip()}' mark."
+            ) from e
+        else:
+            raise
+    _CACHE["key"] = cache_key if keep_loaded else None
+    _CACHE["model"] = instance if keep_loaded else None
+    return instance, lora_note
 
 
 # --------------------------------------------------------------------------- #
@@ -739,13 +777,34 @@ class MfluxModelSampler:
             forwarded, notes = normalize_and_validate(handle.profile, params_mode, requested, image_paths)
             if forwarded.get("pid_decode") and live_preview:
                 notes.append("[mflux] pid_decode: the live preview decodes through the VAE at base resolution; the final image is PiD's 4x re-render and will differ.")
+            policy = _memory_policy()
+            n_images = len(payload.images) if payload is not None else 0
+            saver = policy.make_saver(
+                handle.instance, bool(getattr(handle, "low_ram", True)),
+                bool(getattr(handle, "keep_loaded", True)), n_images,
+            )
+            callbacks = []
+            if saver is not None:
+                settings = policy.saver_settings(
+                    True, bool(getattr(handle, "keep_loaded", True)), n_images,
+                )
+                notes.append(
+                    "[mflux] low-ram: MLX cache cap 1 GB"
+                    + (", text encoder dropped after encoding" if not settings["keep_text_encoder"] else "")
+                    + (", transformer dropped before decode" if not settings["keep_transformer"] else "")
+                    + "."
+                )
+                callbacks.append(saver)
             if live_preview:
-                from .preview import ComfyLivePreview, _RegistryGuard, resolve_latent_creator
+                try:
+                    from .preview import ComfyLivePreview, resolve_latent_creator
+                except ImportError:
+                    from preview import ComfyLivePreview, resolve_latent_creator
                 lc = resolve_latent_creator(handle.family, handle.instance)
-                cb = ComfyLivePreview(handle.instance, lc, node_id=unique_id, stride=int(preview_stride))
-                with _RegistryGuard(handle.instance, cb):
-                    gen = handle.instance.generate_image(**forwarded)
-            else:
+                callbacks.append(ComfyLivePreview(
+                    handle.instance, lc, node_id=unique_id, stride=int(preview_stride),
+                ))
+            with policy.CallbackWindow(handle.instance, callbacks):
                 gen = handle.instance.generate_image(**forwarded)
         finally:
             for p in temps:
@@ -754,6 +813,12 @@ class MfluxModelSampler:
                         os.remove(p)
                     except Exception:
                         pass
+            # keep_loaded off: the decoded PIL already exists (or generate raised).
+            # Drop the module either way so a failed run does not leave Hermes held.
+            if not bool(getattr(handle, "keep_loaded", True)):
+                policy = _memory_policy()
+                policy.release_model(handle, _CACHE)
+                policy.run_hook("MFLUX_AFTER_FREE", required=False)
 
         if getattr(handle, "lora_note", ""):
             notes = [handle.lora_note] + notes

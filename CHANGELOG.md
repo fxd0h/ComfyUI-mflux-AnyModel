@@ -5,6 +5,13 @@ based on Keep a Changelog.
 
 ## Unreleased
 
+- The loader takes `low_ram` (default on). It registers mflux's `MemorySaver` for that
+  generate call: a 1 GB MLX cache cap, the text encoder dropped after encoding, and the
+  transformer dropped before the VAE decode when `keep_loaded` is off and there is at most
+  one reference image. `keep_loaded` off also drops the module and clears the MLX cache
+  after the image is decoded. `MFLUX_BEFORE_LOAD` and `MFLUX_AFTER_FREE`, when set, are
+  shell commands run around the load and the release. With `keep_loaded` off the loader runs
+  again on every queue, so re-queueing a graph never hands the sampler the released model.
 - The loader takes `bake_lora` (default on, as before). Off, mflux applies the full LoRA update
   instead of merging it into the weights, where bf16 rounding drops part of a small delta.
   From @TracyMcgrady256 in #8.
